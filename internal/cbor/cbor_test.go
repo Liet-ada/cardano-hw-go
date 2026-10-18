@@ -10,6 +10,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 )
 
 func unhex(t *testing.T, s string) []byte {
@@ -124,6 +125,55 @@ func TestDecodeErrors(t *testing.T) {
 	}
 	if _, err := Decode(unhex(t, "0000")); !errors.Is(err, ErrTrailingBytes) {
 		t.Errorf("trailing bytes: %v", err)
+	}
+}
+
+// TestDuplicateKeys checks that keys are the same when their canonical
+// forms are, however they are written.
+func TestDuplicateKeys(t *testing.T) {
+	for _, in := range []string{
+		"a20100180100",               // 1 and 1 in the one-byte form
+		"a2f93c00000100",             // 1.0 and 1
+		"a2c24101000100",             // a bignum and 1
+		"a2a20102030400a20304010200", // maps in two orders
+		"a2820102009f0102ff00",       // definite and indefinite arrays
+		"a2d818410000d818410000",     // tagged
+		"a27f6161ff00616100",         // a text in chunks and not
+	} {
+		if _, err := Decode(unhex(t, in)); err == nil || !strings.Contains(err.Error(), "duplicate map key") {
+			t.Errorf("%s: error %v, want a duplicate key", in, err)
+		}
+	}
+	for _, in := range []string{
+		"a28201020082020100", // [1, 2] and [2, 1]
+		"a2410100610100",     // bytes and text
+		"a2d818410000410000", // tagged and not
+		"a2f9000000f9800000", // 0.0 and -0.0
+		"a2a1010200a1010300", // maps that differ in a value
+	} {
+		if _, err := Decode(unhex(t, in)); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+}
+
+// TestDecodeCost bounds the time of a decoding whose cost grew with the
+// cube of the nesting: maps whose key is a map whose key is a map...,
+// when every key was encoded again at each level to find duplicates. 256
+// KiB of them took 3.5 s; with sums, some tens of milliseconds.
+func TestDecodeCost(t *testing.T) {
+	chain := append(bytes.Repeat([]byte{0xa1}, MaxDepth-2), bytes.Repeat([]byte{0x00}, MaxDepth-1)...)
+	data := []byte{0x9f}
+	for len(data) < 256<<10 {
+		data = append(data, chain...)
+	}
+	data = append(data, 0xff)
+	start := time.Now()
+	if _, err := Decode(data); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("decoding %d bytes took %v", len(data), d)
 	}
 }
 

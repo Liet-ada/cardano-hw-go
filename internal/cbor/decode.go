@@ -5,10 +5,13 @@ package cbor
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"math"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -105,6 +108,36 @@ const (
 type decoder struct {
 	data []byte
 	pos  int
+	// sum is the hash of the canonical form of the value decoded last,
+	// built from those of its items, so that a duplicate map key is found
+	// without encoding every key again at each level of nesting
+	sum uint64
+}
+
+var sumSeed = maphash.MakeSeed()
+
+// value decodes a data item and sets d.sum. Values with the same canonical
+// form get the same sum.
+func (d *decoder) value(depth int) (Value, error) {
+	v, err := d.item(depth)
+	if err == nil && !(v.Kind == Array || v.Kind == Map || v.Kind == Tag && !v.IsInt()) {
+		d.sum = maphash.Bytes(sumSeed, EncodeCanonical(v))
+	}
+	return v, err
+}
+
+// containerSum is the sum of an array, map or tag of the given kind, size
+// or tag number and item sums.
+func containerSum(kind Kind, n uint64, sums ...uint64) uint64 {
+	var h maphash.Hash
+	h.SetSeed(sumSeed)
+	var b [8]byte
+	h.WriteByte(byte(kind))
+	h.Write(binary.LittleEndian.AppendUint64(b[:0], n))
+	for _, s := range sums {
+		h.Write(binary.LittleEndian.AppendUint64(b[:0], s))
+	}
+	return h.Sum64()
 }
 
 func (d *decoder) fail(msg string) error { return &DecodeError{d.pos, msg} }
@@ -167,7 +200,9 @@ func (d *decoder) count(info byte, perItem int) (int, error) {
 	return int(n), nil
 }
 
-func (d *decoder) value(depth int) (Value, error) {
+// item decodes a data item, and sets d.sum if it is an array, a map or a
+// tag other than a bignum.
+func (d *decoder) item(depth int) (Value, error) {
 	if depth > MaxDepth {
 		return Value{}, d.fail("nesting too deep")
 	}
@@ -206,6 +241,7 @@ func (d *decoder) value(depth int) (Value, error) {
 
 	case majorArray:
 		items := []Value{}
+		var sums []uint64
 		if info == infoIndefinite {
 			for !d.atBreak() {
 				v, err := d.value(depth + 1)
@@ -213,6 +249,7 @@ func (d *decoder) value(depth int) (Value, error) {
 					return Value{}, err
 				}
 				items = append(items, v)
+				sums = append(sums, d.sum)
 			}
 			d.pos++
 		} else {
@@ -221,35 +258,43 @@ func (d *decoder) value(depth int) (Value, error) {
 				return Value{}, err
 			}
 			items = make([]Value, 0, n)
+			sums = make([]uint64, 0, n)
 			for i := 0; i < n; i++ {
 				v, err := d.value(depth + 1)
 				if err != nil {
 					return Value{}, err
 				}
 				items = append(items, v)
+				sums = append(sums, d.sum)
 			}
 		}
+		d.sum = containerSum(Array, uint64(len(items)), sums...)
 		return Value{Kind: Array, Items: items}, nil
 
 	case majorMap:
 		entries := []Entry{}
-		seen := map[string]bool{}
+		var sums [][2]uint64
+		seen := map[uint64][]int{} // entries by the sum of their key
 		add := func() error {
 			keyAt := d.pos
 			k, err := d.value(depth + 1)
 			if err != nil {
 				return err
 			}
-			key := string(EncodeCanonical(k))
-			if seen[key] {
-				return &DecodeError{keyAt, "duplicate map key"}
+			ks := d.sum
+			// keys with the same sum are compared for real
+			for _, i := range seen[ks] {
+				if Equal(entries[i].Key, k) {
+					return &DecodeError{keyAt, "duplicate map key"}
+				}
 			}
-			seen[key] = true
 			v, err := d.value(depth + 1)
 			if err != nil {
 				return err
 			}
+			seen[ks] = append(seen[ks], len(entries))
 			entries = append(entries, Entry{k, v})
+			sums = append(sums, [2]uint64{ks, d.sum})
 			return nil
 		}
 		if info == infoIndefinite {
@@ -271,6 +316,16 @@ func (d *decoder) value(depth int) (Value, error) {
 				}
 			}
 		}
+		// the canonical form sorts the entries, so the sum does not
+		// depend on their order
+		slices.SortFunc(sums, func(a, b [2]uint64) int {
+			return cmp.Or(cmp.Compare(a[0], b[0]), cmp.Compare(a[1], b[1]))
+		})
+		flat := make([]uint64, 0, 2*len(sums))
+		for _, s := range sums {
+			flat = append(flat, s[0], s[1])
+		}
+		d.sum = containerSum(Map, uint64(len(entries)), flat...)
 		return Value{Kind: Map, Entries: entries}, nil
 
 	case majorTag:
@@ -288,6 +343,7 @@ func (d *decoder) value(depth int) (Value, error) {
 		if (tag == TagPosBignum || tag == TagNegBignum) && content.Kind != Bytes {
 			return Value{}, &DecodeError{start, "bignum whose content is not a byte string"}
 		}
+		d.sum = containerSum(Tag, tag, d.sum) // value takes a bignum's from its encoding
 		return NewTag(tag, content), nil
 	}
 
