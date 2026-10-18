@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Liet-ada/cardano-hw-go/internal/trezor/debuglink"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
 )
 
@@ -44,19 +43,4 @@ func (u *TerminalUI) ButtonRequest(code uint32, name string) {
 	if u.Messages != nil {
 		fmt.Fprintln(u.Messages, "Confirm on the Trezor.")
 	}
-}
-
-// DebugUI answers for the person through the emulator's debug link.
-type DebugUI struct {
-	Debug *debuglink.Debug
-}
-
-// PairingCode asks the emulator for the code it shows.
-func (u *DebugUI) PairingCode(info thp.PairingInfo) (string, error) {
-	return u.Debug.PairingCode(info)
-}
-
-// ButtonRequest presses yes on the emulator.
-func (u *DebugUI) ButtonRequest(uint32, string) {
-	go u.Debug.PressYesSoon()
 }

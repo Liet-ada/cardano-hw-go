@@ -13,11 +13,6 @@ import (
 	"github.com/Liet-ada/cardano-hw-go/internal/usb"
 )
 
-// EnvLedgerSpeculos points to the APDU port (host:port) of the Speculos
-// emulator, or of a simulator speaking its protocol, instead of a USB
-// Ledger.
-const EnvLedgerSpeculos = "CARDANO_HW_GO_LEDGER_SPECULOS"
-
 // Ledger devices: one vendor id for all models; the APDU interface is the
 // HID interface of usage page 0xffa0 (interface 0 on Linux, as Ledger's
 // own transport chooses it).
@@ -53,14 +48,6 @@ func (o *Opener) openOther(d found) (hw.Provider, error) {
 		return nil, fmt.Errorf("opening the Ledger: %w", err)
 	}
 	return openLedger(ledger.NewHIDTransport(dev)), nil
-}
-
-func (o *Opener) openSpeculos(addr string) (hw.Provider, error) {
-	t, err := ledger.DialSpeculos(addr)
-	if err != nil {
-		return nil, fmt.Errorf("no Ledger emulator at %s: %w", addr, err)
-	}
-	return openLedger(t), nil
 }
 
 func openLedger(x ledger.Exchanger) hw.Provider {

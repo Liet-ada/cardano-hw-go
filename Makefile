@@ -4,7 +4,7 @@ GO ?= go
 TREZOR_EMULATOR ?= 127.0.0.1:21324
 FUZZTIME ?= 1m
 
-.PHONY: check fmt vet test emulator fuzz build
+.PHONY: check fmt vet test emulator fuzz build build-emulators
 
 check: fmt vet test
 
@@ -13,6 +13,7 @@ fmt:
 
 vet:
 	$(GO) vet ./...
+	$(GO) vet -tags emulators ./...
 
 test:
 	$(GO) test -race ./...
@@ -21,7 +22,7 @@ test:
 # (emu.py --slip0014); not part of check. One package at a time, as they
 # share the emulator.
 emulator:
-	TREZOR_EMULATOR=$(TREZOR_EMULATOR) $(GO) test -p 1 -count=1 -run Emulator -v ./...
+	TREZOR_EMULATOR=$(TREZOR_EMULATOR) $(GO) test -tags emulators -p 1 -count=1 -run Emulator -v ./...
 
 # Fuzzing, each target for FUZZTIME; not part of check, which runs their
 # seeds. test/cbor-oracle, which compares internal/cbor with
@@ -34,3 +35,8 @@ fuzz:
 
 build:
 	$(GO) build -o bin/ ./cmd/...
+
+# A build that also opens the emulators the environment points to, for
+# tests against cardano-hw-cli; never one to sign with.
+build-emulators:
+	$(GO) build -tags emulators -o bin/emulators/ ./cmd/...

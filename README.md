@@ -20,6 +20,7 @@ A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-
 make check   # format, vet, tests with -race
 make fuzz    # each fuzz target for FUZZTIME (1m), including a comparison with fxamacker/cbor
 make build   # bin/cardano-hw-go
+make build-emulators   # bin/emulators/cardano-hw-go, which also opens emulators (tests only)
 ```
 
 Requires Go 1.26.8 or newer. On macOS, cgo links only the system's IOKit and CoreFoundation frameworks.
@@ -42,9 +43,14 @@ Environment variables:
 | `CARDANO_HW_GO_DEVICE` | `trezor`, `ledger` or `keystone`, when several devices are connected |
 | `CARDANO_HW_GO_THP_STORE` | file of THP credentials (default: the user config directory) |
 | `CARDANO_HW_GO_HOST_NAME` | host name the Trezor shows when pairing and keeps among its paired hosts (default: `cardano-hw-go`, not the computer's name) |
+
+Only builds with `-tags emulators` (`make build-emulators`), for tests, know these; no environment variable can point the normal binary at a device that is not on USB:
+
+| Variable | Use |
+|---|---|
 | `CARDANO_HW_GO_TREZOR_EMULATOR` | `host:port` of the Trezor emulator instead of USB |
 | `CARDANO_HW_GO_LEDGER_SPECULOS` | `host:port` of the APDU port of the Speculos emulator (or `internal/ledger/ledgersim`) instead of a USB Ledger |
-| `CARDANO_HW_GO_DEBUGLINK` | `1` to answer the emulator's screens through its debug link (tests only) |
+| `CARDANO_HW_GO_DEBUGLINK` | `1` to answer the emulator's screens through its debug link |
 
 ## Differences from cardano-hw-cli
 
