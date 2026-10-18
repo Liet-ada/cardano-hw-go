@@ -25,9 +25,11 @@ import (
 
 // ledgerCase is a command run by cardano-hw-cli 1.20.0-beta.4 against the
 // simulated Ledger, with what it printed, wrote and sent to the device.
-// The cases come from cardano-hw-cli's Ledger integration tests, whose
-// keys and signatures are those of a real device; testdata holds them as
-// cardano-hw-cli ran them.
+// testdata holds them as cardano-hw-cli ran them: in ledger-golden.json.gz,
+// the cases of cardano-hw-cli's Ledger integration tests, whose keys and
+// signatures are those of a real device; in ledger-txs-golden.json.gz, the
+// transactions of testdata/txs, and those transform made canonical,
+// witnessed with several sets of those keys.
 type ledgerCase struct {
 	Name, Version string
 	XS            bool
@@ -45,19 +47,40 @@ type simOpener struct{ sim *ledgersim.Sim }
 
 func (o simOpener) Open() (hw.Provider, error) { return hwledger.New(ledger.New(o.sim)), nil }
 
+// ledgerGolden is a file of cases, which hold each file they read once:
+// a case's Inputs map a name to an ID of Files.
+type ledgerGolden struct {
+	Files map[string]string // ID: content in hex
+	Cases []ledgerCase
+}
+
 func readLedgerCases(t *testing.T) []ledgerCase {
-	f, err := os.Open("testdata/ledger-golden.json.gz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	z, err := gzip.NewReader(f)
-	if err != nil {
-		t.Fatal(err)
-	}
 	var cases []ledgerCase
-	if err := json.NewDecoder(z).Decode(&cases); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"testdata/ledger-golden.json.gz", "testdata/ledger-txs-golden.json.gz"} {
+		f, err := os.Open(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		z, err := gzip.NewReader(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var g ledgerGolden
+		err = json.NewDecoder(z).Decode(&g)
+		f.Close()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, c := range g.Cases {
+			for file, id := range c.Inputs {
+				h, ok := g.Files[id]
+				if !ok {
+					t.Fatalf("%s: case %s reads unknown file %s", name, c.Name, id)
+				}
+				c.Inputs[file] = h
+			}
+			cases = append(cases, c)
+		}
 	}
 	return cases
 }

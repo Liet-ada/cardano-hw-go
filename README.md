@@ -8,7 +8,7 @@ A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-
 |---|---|
 | Command line | Same help, usage and errors as cardano-hw-cli 1.20.0-beta.4, including how it reads and checks the files it is given |
 | `transaction validate`, `transaction transform` | Same output as cardano-hw-cli 1.20.0-beta.4 on 5508 test transactions and on 30 of mainnet and preprod |
-| Ledger (Cardano app v7 and v8) | Same output, files and APDUs as cardano-hw-cli 1.20.0-beta.4 against a simulated Ledger, on its Ledger test cases (whose keys and signatures come from a real device) and 1836 more; not yet tested on a device |
+| Ledger (Cardano app v7 and v8) | Same output, files and APDUs as cardano-hw-cli 1.20.0-beta.4 against a simulated Ledger, on its Ledger test cases (whose keys and signatures come from a real device), on 30 transactions of mainnet and preprod and 1836 more; not yet tested on a device |
 | Trezor (THP and Codec v1) | All commands pass against the Trezor Safe 7 emulator |
 | USB on macOS (IOKit) | Builds; not yet tested on a device |
 | Keystone | Not started |
