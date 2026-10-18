@@ -129,8 +129,9 @@ func (p *Provider) ShowAddress(a hw.ShowAddressParams) error {
 		return fmt.Errorf("%w: %v", ErrInvalidAddressParameters, err)
 	}
 	// the device derives the address itself: it must be the one given
+	// (cardano-hw-cli defect trezor-address-not-checked)
 	if r.Address != a.Address {
-		return fmt.Errorf("the Trezor shows %s, not the address in the file (%s)", r.Address, a.Address)
+		return fmt.Errorf("Address mismatch: the Trezor derives %s from the paths, not %s", r.Address, a.Address)
 	}
 	return nil
 }

@@ -267,7 +267,7 @@ func TestEmulatorFlows(t *testing.T) {
 			t.Fatalf("output %q", out)
 		}
 		code, out := e.run("address", "show", "--payment-path", "1852H/1815H/0H/0/7", "--staking-path", "1852H/1815H/0H/2/0", "--address-file", e.path("own.addr"))
-		if code == 0 || !strings.Contains(out, "not the address in the file") {
+		if code == 0 || !strings.Contains(out, "Address mismatch") {
 			t.Fatalf("a wrong path passed: %d %s", code, out)
 		}
 	})

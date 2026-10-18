@@ -37,4 +37,6 @@ aux-key-order-bytewise synthetic metadata whose map has keys of two types, sorte
 aux-key-order-length-first synthetic metadata whose map has keys of two types, sorted by length first, as RFC 7049 does
 tagged-vkey-witness synthetic a fee that is not canonical, and a vkey witness in a set tagged 258
 tagged-bootstrap-witness synthetic a fee that is not canonical, and a bootstrap witness in a set tagged 258
+duplicate-fee synthetic the fee twice in the body
+duplicate-metadata-key synthetic a key twice in a map of the metadata
 one-byte-integers synthetic an output of 30 tokens, whose quantity takes a one-byte argument

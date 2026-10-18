@@ -105,15 +105,15 @@ func TestDecodeErrors(t *testing.T) {
 		{"1c", "reserved"},
 		{"5a00000005", "longer than the input"},
 		{"9b00000000ffffffff00", "longer than the input"},
-		{"a201000100", "duplicate map key"},
-		{"a2410001410002", "duplicate map key"},
+		{"a201000100", "Duplicate keys in a map"},
+		{"a2410001410002", "Duplicate keys in a map"},
 		{"62c328", "invalid UTF-8"},
 		{"7f61c361a9ff", "invalid UTF-8"}, // a character split between chunks
 		{"5f4101610200ff", "invalid chunk"},
 		{"5f5f4101ffff", "invalid chunk"},
 		{"ff", "unexpected break"},
 		{"f800", "two-byte form"},
-		{"c26161", "bignum"},
+		{"c26161", "Bignum whose content"},
 		{"1f", "indefinite length integer"},
 		{"df00", "indefinite length tag"},
 		{"9f01", "unexpected end"},
@@ -140,7 +140,7 @@ func TestDuplicateKeys(t *testing.T) {
 		"a2d818410000d818410000",     // tagged
 		"a27f6161ff00616100",         // a text in chunks and not
 	} {
-		if _, err := Decode(unhex(t, in)); err == nil || !strings.Contains(err.Error(), "duplicate map key") {
+		if _, err := Decode(unhex(t, in)); err == nil || !errors.Is(err, ErrDuplicateKey) {
 			t.Errorf("%s: error %v, want a duplicate key", in, err)
 		}
 	}
@@ -182,8 +182,8 @@ func TestDepthLimit(t *testing.T) {
 	if _, err := Decode(deep); err != nil {
 		t.Fatalf("depth %d: %v", MaxDepth, err)
 	}
-	if _, err := Decode(append([]byte{0x81}, deep...)); err == nil {
-		t.Fatal("depth past the limit decoded")
+	if _, err := Decode(append([]byte{0x81}, deep...)); !errors.Is(err, ErrTooDeep) {
+		t.Fatalf("depth past the limit: %v", err)
 	}
 }
 

@@ -22,6 +22,18 @@ const MaxDepth = 512
 // ErrTrailingBytes reports bytes left after the data item.
 var ErrTrailingBytes = errors.New("cbor: trailing bytes after the data item")
 
+// What Decode refuses in well-formed input, in words for the person.
+var (
+	// ErrDuplicateKey is node-cbor's error, which cardano-hw-cli prints.
+	ErrDuplicateKey = errors.New("Duplicate keys in a map")
+	// ErrTooDeep is for what node-cbor takes until its stack runs out
+	// (cardano-hw-cli defect cbor-nesting-too-deep).
+	ErrTooDeep = fmt.Errorf("CBOR nested more than %d levels deep", MaxDepth)
+	// ErrBignumNotBytes is for a bignum node-cbor takes, which the ledger
+	// cannot decode (cardano-hw-cli defect cbor-bignum-not-bytes).
+	ErrBignumNotBytes = errors.New("Bignum whose content is not a byte string")
+)
+
 // DecodeError reports malformed input at a byte offset.
 type DecodeError struct {
 	Offset int
@@ -204,7 +216,7 @@ func (d *decoder) count(info byte, perItem int) (int, error) {
 // tag other than a bignum.
 func (d *decoder) item(depth int) (Value, error) {
 	if depth > MaxDepth {
-		return Value{}, d.fail("nesting too deep")
+		return Value{}, ErrTooDeep
 	}
 	start := d.pos
 	major, info, err := d.head()
@@ -276,7 +288,6 @@ func (d *decoder) item(depth int) (Value, error) {
 		var sums [][2]uint64
 		seen := map[uint64][]int{} // entries by the sum of their key
 		add := func() error {
-			keyAt := d.pos
 			k, err := d.value(depth + 1)
 			if err != nil {
 				return err
@@ -285,7 +296,7 @@ func (d *decoder) item(depth int) (Value, error) {
 			// keys with the same sum are compared for real
 			for _, i := range seen[ks] {
 				if Equal(entries[i].Key, k) {
-					return &DecodeError{keyAt, "duplicate map key"}
+					return ErrDuplicateKey
 				}
 			}
 			v, err := d.value(depth + 1)
@@ -341,7 +352,7 @@ func (d *decoder) item(depth int) (Value, error) {
 			return Value{}, err
 		}
 		if (tag == TagPosBignum || tag == TagNegBignum) && content.Kind != Bytes {
-			return Value{}, &DecodeError{start, "bignum whose content is not a byte string"}
+			return Value{}, ErrBignumNotBytes
 		}
 		d.sum = containerSum(Tag, tag, d.sum) // value takes a bignum's from its encoding
 		return NewTag(tag, content), nil

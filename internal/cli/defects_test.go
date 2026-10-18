@@ -52,10 +52,24 @@ const (
 	fixableIssues  = "The transaction contains the following fixable issues:\n- CBOR is not canonical (transaction)\n"
 	errNoTransport = "Error: Error occurred while trying to find hw transport, make sure Ledger or Trezor or Keystone is connected to your computer\n"
 	// how cardano-hw-cli wraps an error of ledgerjs, even one for bad input
-	ledgerFailed      = "Error: The requested operation failed. Check that your Ledger device is connected, unlocked and with Cardano app running.\n"
+	ledgerFailed = "Error: The requested operation failed. Check that your Ledger device is connected, unlocked and with Cardano app running.\n"
+	// a transaction whose metadata is {1: x}, for the x of metadataTx
+	metadataTxHead = "84a400d901028182582000000000000000000000000000000000000000000000000000000000000000000001818258" +
+		"1d60000102030405060708090a0b0c0d0e0f101112131415161718191a1b1a001e8480021a00030d40031903e8a0f5a101"
 	ledgerWitnessCase = "tx-ordinary_InputAndOutput@7.1.4"
 	ledgerOpCertCase  = "opcert-opcert1@7.1.4"
 )
+
+// metadataTx is a transaction file whose metadata is {1: x}, x in hex.
+func metadataTx(x string) string {
+	return `{"type":"Unwitnessed Tx ConwayEra","description":"","cborHex":"` + metadataTxHead + x + `"}`
+}
+
+// emulatorDefects are tested against the Trezor emulator, by the
+// subtests of TestEmulatorFlows named here.
+var emulatorDefects = map[string]string{
+	"trezor-address-not-checked": "show address",
+}
 
 var defectCases = []defectCase{
 	{
@@ -152,6 +166,30 @@ var defectCases = []defectCase{
 		exit:   1,
 		stderr: "Error: Invalid protocol magic: 4294967296\n",
 		hwcli:  ledgerFailed + "Details: " + ledgerFailed + "Details: InvalidData: invalid protocol magic\n",
+	},
+	{
+		// cardano-hw-cli takes it
+		defect: "cbor-nesting-too-deep",
+		args:   []string{"transaction", "validate", "--tx-file", "deep.json"},
+		inputs: map[string]string{"deep.json": metadataTx(strings.Repeat("81", 600) + "00")},
+		exit:   1,
+		stderr: "Error: CBOR nested more than 512 levels deep\n",
+	},
+	{
+		defect: "cbor-nesting-too-deep",
+		args:   []string{"transaction", "validate", "--tx-file", "deep.json"},
+		inputs: map[string]string{"deep.json": metadataTx(strings.Repeat("81", 5000) + "00")},
+		exit:   1,
+		stderr: "Error: CBOR nested more than 512 levels deep\n",
+		hwcli:  "Error: Maximum call stack size exceeded\n",
+	},
+	{
+		defect: "cbor-bignum-not-bytes",
+		args:   []string{"transaction", "validate", "--tx-file", "bignum.json"},
+		inputs: map[string]string{"bignum.json": metadataTx("c26161")},
+		exit:   1,
+		stderr: "Error: Bignum whose content is not a byte string\n",
+		hwcli:  fixableIssues,
 	},
 	{
 		defect: "trezor-message-hex-odd-length",
@@ -268,7 +306,7 @@ func TestDefects(t *testing.T) {
 		})
 	}
 	for _, d := range defects.All {
-		if !tested[d.ID] {
+		if _, ok := emulatorDefects[d.ID]; !tested[d.ID] && !ok {
 			t.Errorf("defect %s has no test", d.ID)
 		}
 	}

@@ -80,6 +80,23 @@ var All = []Defect{
 		Here:  "the error for a path that cannot be parsed",
 	},
 	{
+		ID:    "cbor-nesting-too-deep",
+		HWCLI: "a transaction nested more than 512 levels deep is taken, until node-cbor's stack runs out a few thousand levels down and it crashes",
+		Here:  "an error beyond 512 levels, which no transaction needs",
+		Shows: regexp.MustCompile(`Error: Maximum call stack size exceeded`),
+		Says:  "Error: CBOR nested more than 512 levels deep",
+	},
+	{
+		ID:    "cbor-bignum-not-bytes",
+		HWCLI: "a bignum whose content is not a byte string is taken, though the ledger cannot decode it, and the transaction is called fixable",
+		Here:  "an error for the bignum",
+	},
+	{
+		ID:    "trezor-address-not-checked",
+		HWCLI: "address show with a Trezor has the device show the address it derives from the paths, but never compares it with the address file",
+		Here:  "an error when they differ",
+	},
+	{
 		ID:    "trezor-message-hex-odd-length",
 		HWCLI: "message sign with a Trezor passes on a message hex of an odd number of digits, which trezor-connect lets through, and asks the device for a message of a fractional size",
 		Here:  "trezor-connect's error for a message that is not hex",
