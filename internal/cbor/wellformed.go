@@ -3,14 +3,19 @@
 
 package cbor
 
-import "errors"
+import (
+	"errors"
+	"unicode/utf8"
+)
 
 // ErrNotWellFormed reports bytes that are not one well-formed data item.
 var ErrNotWellFormed = errors.New("cbor: not well-formed")
 
 // WellFormed reports whether data is exactly one well-formed data item
-// (RFC 8949, section 5.3.1), without the checks Decode adds. It is what
-// cardano-hw-cli's CBOR library accepts when it tells CBOR from not.
+// (RFC 8949, section 5.3.1) whose text strings (each chunk of an
+// indefinite one on its own) are UTF-8 and whose two-byte simple values
+// are 32 or more: what node-cbor, cardano-hw-cli's CBOR library, decodes.
+// Unlike Decode, it allows duplicate map keys, as node-cbor does.
 func WellFormed(data []byte) error {
 	end, err := wellFormedItem(data, 0, 0)
 	if err != nil {
@@ -86,6 +91,9 @@ func wellFormedItem(b []byte, i, depth int) (int, error) {
 		if arg > uint64(len(b)-i) {
 			return 0, ErrNotWellFormed
 		}
+		if major == majorText && !utf8.Valid(b[i:i+int(arg)]) {
+			return 0, ErrNotWellFormed
+		}
 		return i + int(arg), nil
 	case majorArray, majorMap:
 		n := arg
@@ -104,6 +112,9 @@ func wellFormedItem(b []byte, i, depth int) (int, error) {
 		return i, nil
 	case majorTag:
 		return wellFormedItem(b, i, depth+1)
+	}
+	if major == majorSimple && info == 24 && arg < 32 {
+		return 0, ErrNotWellFormed // a simple value in the two-byte form
 	}
 	return i, nil
 }
