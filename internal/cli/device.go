@@ -37,6 +37,7 @@ var (
 	errInvalidCVotePublicKey    = errors.New("Invalid CIP36 vote public key")
 	errInvalidMessage           = errors.New("Invalid message to sign, should be ASCII")
 	errInvalidScriptHashHex     = errors.New("Invalid script hash hex")
+	errTestnetMagicMissing      = errors.New("Testnet protocol magic is missing")
 )
 
 // withDevice runs f with the device the command opened.
@@ -77,24 +78,26 @@ func derivationType(p *args) (hw.DerivationType, error) {
 }
 
 // bigUint64 reads a number as cardano-hw-cli's BigInt does; one out of
-// the range of 64 bits is refused here, where cardano-hw-cli only fails at
-// the device.
+// the range of 64 bits, which cardano-hw-cli only refuses at the device,
+// is refused here (cardano-hw-cli defect number-out-of-range).
 func bigUint64(s string) (uint64, error) {
 	n, err := jsBigInt(s)
 	if err != nil {
 		return 0, err
 	}
 	if n.Sign() < 0 || !n.IsUint64() {
-		return 0, fmt.Errorf("number out of range: %s", s)
+		return 0, fmt.Errorf("Number out of range: %s", s)
 	}
 	return n.Uint64(), nil
 }
 
 // network reads --mainnet or --testnet-magic; mainnet is the default. The
-// magic is read by parseInt, as cardano-hw-cli does, so "1x" is 1.
-// cardano-hw-cli goes on with a magic that is not a number, a value after
-// --mainnet, or no network after --testnet-magic alone, and fails later
-// in ways of its own; here they are refused.
+// magic is read by parseInt, as cardano-hw-cli does, so "1x" is 1. What
+// cardano-hw-cli goes on with and fails on later is refused here: a value
+// after --mainnet (cardano-hw-cli defect mainnet-value), --testnet-magic
+// without a magic (cardano-hw-cli defect testnet-magic-missing) and a
+// magic that is not a number of 32 bits (cardano-hw-cli defect
+// testnet-magic-not-number).
 func network(p *args) (cardano.Network, error) {
 	v, ok := p.get("network")
 	// the option given last decides, as both store the network
@@ -105,17 +108,17 @@ func network(p *args) (cardano.Network, error) {
 		}
 	}
 	if last == "--mainnet" && v != "mainnet" {
-		return cardano.Network{}, fmt.Errorf("invalid network %q after --mainnet", v)
+		return cardano.Network{}, fmt.Errorf("Invalid network after --mainnet: %s", v)
 	}
 	if !ok || v == "mainnet" {
 		return cardano.Mainnet, nil
 	}
 	if v == "" {
-		return cardano.Network{}, js.NewTypeError("Cannot read properties of undefined (reading 'networkId')")
+		return cardano.Network{}, errTestnetMagicMissing
 	}
 	magic := js.ParseInt(v)
 	if math.IsNaN(magic) || magic < 0 || magic > math.MaxUint32 {
-		return cardano.Network{}, fmt.Errorf("invalid protocol magic %q", v)
+		return cardano.Network{}, fmt.Errorf("Invalid protocol magic: %s", v)
 	}
 	return cardano.Network{NetworkID: cardano.NetworkIDTestnet, ProtocolMagic: uint32(magic)}, nil
 }
@@ -495,7 +498,7 @@ func (a *App) issueOpCert(p *args) error {
 	ps, _ := p.get("kesPeriod")
 	period, err := bigUint64(ps)
 	if err != nil {
-		return fmt.Errorf("invalid KES period %q", ps)
+		return fmt.Errorf("Invalid KES period: %s", ps)
 	}
 	files, err := readSigningFiles(p.all("hwSigningFileData"))
 	if err != nil {
@@ -560,7 +563,7 @@ func (a *App) cip36(p *args) error {
 	for _, w := range p.all("voteWeights") {
 		n, err := bigUint64(w)
 		if err != nil {
-			return fmt.Errorf("invalid vote weight %q", w)
+			return fmt.Errorf("Invalid vote weight: %s", w)
 		}
 		weights = append(weights, n)
 	}
@@ -573,12 +576,12 @@ func (a *App) cip36(p *args) error {
 	ns, _ := p.get("nonce")
 	nonce, err := bigUint64(ns)
 	if err != nil {
-		return fmt.Errorf("invalid nonce %q", ns)
+		return fmt.Errorf("Invalid nonce: %s", ns)
 	}
 	purpose := uint64(0) // Catalyst
 	if vs, ok := p.get("votingPurpose"); ok {
 		if purpose, err = bigUint64(vs); err != nil {
-			return fmt.Errorf("invalid voting purpose %q", vs)
+			return fmt.Errorf("Invalid voting purpose: %s", vs)
 		}
 	}
 	paymentFiles, err := readSigningFiles(p.all("paymentAddressSigningKeyData"))

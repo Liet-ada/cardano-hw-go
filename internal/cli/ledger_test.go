@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Liet-ada/cardano-hw-go/internal/defects"
 	"github.com/Liet-ada/cardano-hw-go/internal/hw"
 	hwledger "github.com/Liet-ada/cardano-hw-go/internal/hw/ledger"
 	"github.com/Liet-ada/cardano-hw-go/internal/ledger"
@@ -131,8 +132,9 @@ func TestLedgerAgainstHWCLI(t *testing.T) {
 			if stdout.String() != c.Stdout {
 				t.Errorf("stdout:\n%s\nwant:\n%s", stdout.String(), c.Stdout)
 			}
-			if got := strings.TrimSpace(stderr.String()); got != c.Stderr {
-				t.Errorf("stderr:\n%s\nwant:\n%s", got, c.Stderr)
+			// what cardano-hw-cli printed, but for its defects
+			if got, want := strings.TrimSpace(stderr.String()), defects.Correct(c.Stderr); got != want {
+				t.Errorf("stderr:\n%s\nwant:\n%s", got, want)
 			}
 			var transcript []string
 			for _, e := range sim.Transcript() {

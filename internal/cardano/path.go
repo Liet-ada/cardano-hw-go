@@ -27,7 +27,8 @@ var ErrInvalidPath = errors.New("Can not parse path")
 // ParsePath reads a path like 1852H/1815H/0H/0/0 as cardano-hw-cli does:
 // each part is read by parseInt, so "12x" is 12 and "0h" is 0 (not
 // hardened). A part out of the range of 32 bits, which cardano-hw-cli
-// would only refuse later, is refused here.
+// only refuses at the device, is refused here (cardano-hw-cli defect
+// path-part-out-of-range).
 func ParsePath(s string) (Path, error) {
 	var p Path
 	for _, part := range strings.Split(s, "/") {

@@ -45,6 +45,10 @@ Environment variables:
 | `CARDANO_HW_GO_LEDGER_SPECULOS` | `host:port` of the APDU port of the Speculos emulator (or `internal/ledger/ledgersim`) instead of a USB Ledger |
 | `CARDANO_HW_GO_DEBUGLINK` | `1` to answer the emulator's screens through its debug link (tests only) |
 
+## Differences from cardano-hw-cli
+
+Where cardano-hw-cli mishandles an input, crashing with a JavaScript error or going on with a value it should refuse, cardano-hw-go does what cardano-hw-cli means to do instead of copying the defect. [internal/defects](internal/defects/defects.go) lists them. The tests that compare cardano-hw-go with recordings of cardano-hw-cli expect the correction where a recording shows a defect, and each defect has a test of its own.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

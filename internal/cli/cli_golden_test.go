@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Liet-ada/cardano-hw-go/internal/defects"
 	"github.com/Liet-ada/cardano-hw-go/internal/device"
 	"github.com/Liet-ada/cardano-hw-go/internal/hw"
 )
@@ -85,8 +86,9 @@ func TestCLIAgainstHWCLI(t *testing.T) {
 			if stdout.String() != c.Stdout {
 				t.Errorf("stdout:\n%s\nwant:\n%s", stdout.String(), c.Stdout)
 			}
-			if stderr.String() != c.Stderr {
-				t.Errorf("stderr:\n%s\nwant:\n%s", stderr.String(), c.Stderr)
+			// what cardano-hw-cli printed, but for its defects
+			if want := defects.Correct(c.Stderr); stderr.String() != want {
+				t.Errorf("stderr:\n%s\nwant:\n%s", stderr.String(), want)
 			}
 			files, err := os.ReadDir(dir)
 			if err != nil {

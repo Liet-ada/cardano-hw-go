@@ -106,6 +106,7 @@ func parseNativeScript(v js.Value) (NativeScript, error) {
 			return NativeScript{}, err
 		}
 	case ScriptNOfK:
+		// an integer (cardano-hw-cli defect native-script-fractional-required)
 		n, ok := number("required")
 		if !ok || !n.IsInteger() {
 			return NativeScript{}, ErrInvalidNativeScriptFile
@@ -115,12 +116,10 @@ func parseNativeScript(v js.Value) (NativeScript, error) {
 			return NativeScript{}, err
 		}
 	case ScriptInvalidBefore, ScriptInvalidHereafter:
+		// an integer (cardano-hw-cli defect native-script-fractional-slot)
 		n, ok := number("slot")
-		if !ok {
+		if !ok || !n.IsInteger() {
 			return NativeScript{}, ErrInvalidNativeScriptFile
-		}
-		if !n.IsInteger() {
-			return NativeScript{}, &js.Error{Name: "RangeError", Message: "The number " + js.NumberToString(n.Num) + " cannot be converted to a BigInt because it is not an integer"}
 		}
 		s.Slot = uint64(n.Num)
 	}

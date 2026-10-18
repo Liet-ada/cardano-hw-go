@@ -206,8 +206,9 @@ func (a *App) validate(p *args) (int, error) {
 }
 
 // readCostModels is cardano-hw-cli's extractCostModels: the cost models of
-// a protocol parameters file, by language. Values that are not integers,
-// which cardano-hw-cli passes on, are refused as not numbers.
+// a protocol parameters file, by language. Values that are not safe
+// integers, which cardano-hw-cli passes on, are refused as not numbers
+// (cardano-hw-cli defect cost-model-fractional).
 func readCostModels(path string) (tx.CostModels, error) {
 	v, err := readJSONFile(path)
 	if err != nil {
@@ -307,6 +308,8 @@ func (a *App) transform(p *args) error {
 		return err
 	}
 	if r.fixable {
+		// witnesses in a tagged set count too (cardano-hw-cli defect
+		// transform-tagged-witnesses)
 		if tx.HasVKeyWitnesses(&t) {
 			return errCannotTransformSigned
 		}
