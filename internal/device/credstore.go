@@ -15,7 +15,8 @@ import (
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
 )
 
-// FileStore keeps THP credentials in a file only its owner can read. A
+// FileStore keeps THP credentials in a file only its owner can read, where
+// there is no keychain (or CARDANO_HW_GO_THP_STORE names one). A
 // credential lets this host reopen a channel without the pairing code; it
 // is not a key of the wallet, and every action still needs the person on
 // the Trezor.
@@ -30,7 +31,8 @@ type storedCredential struct {
 	Credential            string `json:"credential"`
 }
 
-// DefaultStorePath is where the credentials are kept by default.
+// DefaultStorePath is the file of the credentials where there is no
+// keychain.
 func DefaultStorePath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
