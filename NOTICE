@@ -1,0 +1,58 @@
+cardano-hw-go
+Copyright 2026 Liet-ada
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+cardano-hw-go reimplements in Go the command line interface of
+cardano-hw-cli by Vacuumlabs, and includes code ported from these projects:
+
+- internal/tx is ported from cardano-hw-interop-lib by Vacuumlabs
+  (https://github.com/vacuumlabs/cardano-hw-interop-lib), and internal/cli
+  and internal/hw follow cardano-hw-cli by Vacuumlabs
+  (https://github.com/vacuumlabs/cardano-hw-cli). Both are licensed under the
+  ISC license:
+
+    Copyright (c) Vacuumlabs
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+    IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+  The test data in internal/cli/testdata and the keys checked in
+  internal/ledger/ledgersim come from cardano-hw-cli's Ledger integration
+  tests, under the same license.
+
+- internal/ledger is ported from ledgerjs-hw-app-cardano by Vacuumlabs,
+  now kept by the Cardano Foundation
+  (https://github.com/cardano-foundation/ledgerjs-hw-app-cardano),
+  licensed under the Apache License, Version 2.0.
+
+- internal/cli/argparse.go and internal/cli/helpformat.go reproduce, in
+  Go, the parsing algorithm and the help formatting of the argparse
+  package for JavaScript (https://github.com/nodeca/argparse) version
+  2.0.1, itself a port of Python 3.9's argparse module:
+
+    Copyright (C) 2010-2020 Python Software Foundation.
+    Copyright (C) 2020 argparse.js authors
+
+  licensed under the Python Software Foundation License Version 2, whose
+  text is in LICENSE-PSF. Summary of the changes: only the parts that
+  cardano-hw-cli's command line uses are reproduced (subcommands, long
+  options with one, an optional or no value, repeatable options, mutually
+  exclusive groups, prefixes of options, type functions, help and usage
+  formatting, and the line wrapping of the JavaScript port), rewritten in
+  Go with the command tree of cardano-hw-cli.
+
+The Trezor Host Protocol (internal/trezor/thp) is implemented from its
+published specification. The Trezor protocol buffers messages
+(internal/trezor/msg) are written by hand from the message layouts that
+SatoshiLabs defines in trezor-firmware (LGPL-3.0); no file of that project
+is included.
