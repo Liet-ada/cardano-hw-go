@@ -92,11 +92,21 @@ func bigUint64(s string) (uint64, error) {
 
 // network reads --mainnet or --testnet-magic; mainnet is the default. The
 // magic is read by parseInt, as cardano-hw-cli does, so "1x" is 1.
-// cardano-hw-cli goes on with a magic that is not a number, or with no
-// network after --testnet-magic alone, and fails later in ways of its
-// own; here they are refused.
+// cardano-hw-cli goes on with a magic that is not a number, a value after
+// --mainnet, or no network after --testnet-magic alone, and fails later
+// in ways of its own; here they are refused.
 func network(p *args) (cardano.Network, error) {
 	v, ok := p.get("network")
+	// the option given last decides, as both store the network
+	last := ""
+	for _, g := range p.given {
+		if g.name == "--mainnet" || g.name == "--testnet-magic" {
+			last = g.name
+		}
+	}
+	if last == "--mainnet" && v != "mainnet" {
+		return cardano.Network{}, fmt.Errorf("invalid network %q after --mainnet", v)
+	}
 	if !ok || v == "mainnet" {
 		return cardano.Mainnet, nil
 	}
