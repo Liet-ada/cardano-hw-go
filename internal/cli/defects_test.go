@@ -34,8 +34,9 @@ type defectCase struct {
 	stdout string
 	stderr string
 	wrote  map[string]string // files written, by name
-	// hwcli is the error cardano-hw-cli prints for the same command line
-	// with no device, when it prints one
+	// hwcli is what cardano-hw-cli printed on stderr for the same command
+	// line, with the simulated Ledger when ledger is set, when it was
+	// recorded
 	hwcli string
 }
 
@@ -48,8 +49,10 @@ const (
 	// the same with no vkey witness and a bootstrap witness in a tagged set
 	txTaggedBootstrapWitness = `{"type":"Witnessed Tx ConwayEra","description":"","cborHex":"84a400d9010281825820000000000000000000000000000000000000000000000000000000000000000000018182581d60000102030405060708090a0b0c0d0e0f101112131415161718191a1b1a001e8480021b0000000000030d40031903e8a2008002d901028184582001010101010101010101010101010101010101010101010101010101010101015840000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005820000000000000000000000000000000000000000000000000000000000000000041a0f5f6"}`
 
-	fixableIssues     = "The transaction contains the following fixable issues:\n- CBOR is not canonical (transaction)\n"
-	errNoTransport    = "Error: Error occurred while trying to find hw transport, make sure Ledger or Trezor or Keystone is connected to your computer\n"
+	fixableIssues  = "The transaction contains the following fixable issues:\n- CBOR is not canonical (transaction)\n"
+	errNoTransport = "Error: Error occurred while trying to find hw transport, make sure Ledger or Trezor or Keystone is connected to your computer\n"
+	// how cardano-hw-cli wraps an error of ledgerjs, even one for bad input
+	ledgerFailed      = "Error: The requested operation failed. Check that your Ledger device is connected, unlocked and with Cardano app running.\n"
 	ledgerWitnessCase = "tx-ordinary_InputAndOutput@7.1.4"
 	ledgerOpCertCase  = "opcert-opcert1@7.1.4"
 )
@@ -111,11 +114,20 @@ var defectCases = []defectCase{
 		hwcli:  errNoTransport,
 	},
 	{
+		defect: "path-part-out-of-range",
+		args:   []string{"address", "key-gen", "--path", "1852H/1815H/0H/0/4294967296", "--hw-signing-file", "p", "--verification-key-file", "v"},
+		ledger: ledgerWitnessCase,
+		exit:   1,
+		stderr: "Error: Can not parse path\n",
+		hwcli:  ledgerFailed + "Details: InvalidData: invalid path\n",
+	},
+	{
 		defect: "testnet-magic-missing",
 		args:   []string{"transaction", "witness", "--testnet-magic", "--tx-file", "tx.json", "--hw-signing-file", "payment0.hwsfile", "--out-file", "w0.witness"},
 		ledger: ledgerWitnessCase,
 		exit:   1,
 		stderr: "Error: Testnet protocol magic is missing\n",
+		hwcli:  "Error: Cannot read properties of undefined (reading 'networkId')\n",
 	},
 	{
 		defect: "mainnet-value",
@@ -123,6 +135,7 @@ var defectCases = []defectCase{
 		ledger: ledgerWitnessCase,
 		exit:   1,
 		stderr: "Error: Invalid network after --mainnet: x\n",
+		hwcli:  ledgerFailed + "Details: " + ledgerFailed + "Details: InvalidData: invalid protocol magic\n",
 	},
 	{
 		defect: "testnet-magic-not-number",
@@ -130,6 +143,7 @@ var defectCases = []defectCase{
 		ledger: ledgerWitnessCase,
 		exit:   1,
 		stderr: "Error: Invalid protocol magic: abc\n",
+		hwcli:  ledgerFailed + "Details: " + ledgerFailed + "Details: InvalidData: invalid protocol magic\n",
 	},
 	{
 		defect: "testnet-magic-not-number",
@@ -137,6 +151,7 @@ var defectCases = []defectCase{
 		ledger: ledgerWitnessCase,
 		exit:   1,
 		stderr: "Error: Invalid protocol magic: 4294967296\n",
+		hwcli:  ledgerFailed + "Details: " + ledgerFailed + "Details: InvalidData: invalid protocol magic\n",
 	},
 	{
 		defect: "trezor-message-hex-odd-length",
@@ -151,6 +166,7 @@ var defectCases = []defectCase{
 		ledger: ledgerOpCertCase,
 		exit:   1,
 		stderr: "Error: Invalid KES period: 18446744073709551616\n",
+		hwcli:  ledgerFailed + "Details: InvalidData: invalid operational certificate kes period\n",
 	},
 	{
 		defect: "number-out-of-range",
@@ -158,6 +174,7 @@ var defectCases = []defectCase{
 		ledger: ledgerOpCertCase,
 		exit:   1,
 		stderr: "Error: Invalid KES period: -1\n",
+		hwcli:  ledgerFailed + "Details: InvalidData: invalid operational certificate kes period\n",
 	},
 }
 

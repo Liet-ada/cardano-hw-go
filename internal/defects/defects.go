@@ -66,17 +66,17 @@ var All = []Defect{
 	},
 	{
 		ID:    "mainnet-value",
-		HWCLI: "--mainnet takes an optional value with no type function, so --mainnet x keeps the string x as the network",
+		HWCLI: "--mainnet takes an optional value with no type function, so --mainnet x keeps the string x as the network; the device's library refuses it as a protocol magic, on a Ledger under the error for a device that is not connected",
 		Here:  "an error for the value",
 	},
 	{
 		ID:    "testnet-magic-not-number",
-		HWCLI: "a protocol magic that is not a number, or not one of 32 bits, is taken as NaN or as is, and fails at the device",
+		HWCLI: "a protocol magic that is not a number, or not one of 32 bits, is taken as NaN or as is, and only the device's library refuses it, on a Ledger under the error for a device that is not connected",
 		Here:  "an error for the protocol magic",
 	},
 	{
 		ID:    "path-part-out-of-range",
-		HWCLI: "a derivation path with a part beyond 32 bits is taken, and fails at the device",
+		HWCLI: "a derivation path with a part beyond 32 bits is taken, and only the device's library refuses it, on a Ledger under the error for a device that is not connected",
 		Here:  "the error for a path that cannot be parsed",
 	},
 	{
@@ -86,7 +86,7 @@ var All = []Defect{
 	},
 	{
 		ID:    "number-out-of-range",
-		HWCLI: "a number given on the command line that is negative or beyond 64 bits is taken as a BigInt, and fails at the device",
+		HWCLI: "a number given on the command line that is negative or beyond 64 bits is taken as a BigInt, and only the device's library refuses it, on a Ledger under the error for a device that is not connected",
 		Here:  "an error that names the option",
 	},
 }

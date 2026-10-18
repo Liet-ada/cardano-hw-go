@@ -78,8 +78,8 @@ func derivationType(p *args) (hw.DerivationType, error) {
 }
 
 // bigUint64 reads a number as cardano-hw-cli's BigInt does; one out of
-// the range of 64 bits, which cardano-hw-cli only refuses at the device,
-// is refused here (cardano-hw-cli defect number-out-of-range).
+// the range of 64 bits, which in cardano-hw-cli only the device's library
+// refuses, is refused here (cardano-hw-cli defect number-out-of-range).
 func bigUint64(s string) (uint64, error) {
 	n, err := jsBigInt(s)
 	if err != nil {
@@ -93,7 +93,7 @@ func bigUint64(s string) (uint64, error) {
 
 // network reads --mainnet or --testnet-magic; mainnet is the default. The
 // magic is read by parseInt, as cardano-hw-cli does, so "1x" is 1. What
-// cardano-hw-cli goes on with and fails on later is refused here: a value
+// cardano-hw-cli goes on with, until it fails, is refused here: a value
 // after --mainnet (cardano-hw-cli defect mainnet-value), --testnet-magic
 // without a magic (cardano-hw-cli defect testnet-magic-missing) and a
 // magic that is not a number of 32 bits (cardano-hw-cli defect
