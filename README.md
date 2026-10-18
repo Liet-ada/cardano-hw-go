@@ -18,6 +18,7 @@ A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-
 
 ```
 make check   # format, vet, tests with -race
+make fuzz    # each fuzz target for FUZZTIME (1m), including a comparison with fxamacker/cbor
 make build   # bin/cardano-hw-go
 ```
 

@@ -242,24 +242,3 @@ func TestHalf(t *testing.T) {
 		}
 	}
 }
-
-func FuzzDecode(f *testing.F) {
-	for _, s := range []string{"00", "a26161016162820203", "9f018202039f0405ffff", "c249010000000000000000"} {
-		b, _ := hex.DecodeString(s)
-		f.Add(b)
-	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		v, err := Decode(data)
-		if err != nil {
-			return
-		}
-		canon := EncodeCanonical(v)
-		w, err := Decode(canon)
-		if err != nil {
-			t.Fatalf("canonical form does not decode: %x: %v", canon, err)
-		}
-		if !bytes.Equal(EncodeCanonical(w), canon) {
-			t.Fatalf("canonical form is not stable: %x", canon)
-		}
-	})
-}
