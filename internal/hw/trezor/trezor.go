@@ -8,6 +8,7 @@ package trezor
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -34,6 +35,8 @@ var (
 	ErrHashPayloadUnsupported     = errors.New("Trezor does not support the `--hashed` option in message signing")
 	ErrMissingAuxDataSupplement   = errors.New("Missing auxiliary data supplement in response.")
 	ErrMissingCIP36Signature      = errors.New("Missing CIP36 voting signature")
+	// trezor-connect's, which cardano-hw-cli prints
+	ErrMessagePayloadNotHex = errors.New(`Message payload must be a hexadecimal string without a "0x" prefix.`)
 )
 
 // chunkSize is the size of the chunks of inline datums and reference
@@ -736,7 +739,6 @@ func (p *Provider) SignMessage(m hw.SignMessageParams) (hw.SignedMessage, error)
 	}
 	init := &msg.CardanoSignMessageInit{
 		SigningPath:      path(m.SigningFile.Path),
-		PayloadSize:      uint32(len(m.Message)),
 		PreferHexDisplay: m.PreferHexDisplay,
 		DerivationType:   derivation(m.DerivationType),
 	}
@@ -755,6 +757,14 @@ func (p *Provider) SignMessage(m hw.SignMessageParams) (hw.SignedMessage, error)
 		init.NetworkID = u32(network.NetworkID)
 		init.ProtocolMagic = u32(network.ProtocolMagic)
 	}
+	// trezor-connect checks the digits and the prefix, but lets an odd
+	// number of digits through (cardano-hw-cli defect
+	// trezor-message-hex-odd-length)
+	message, err := hex.DecodeString(m.MessageHex)
+	if err != nil {
+		return hw.SignedMessage{}, ErrMessagePayloadNotHex
+	}
+	init.PayloadSize = uint32(len(message))
 	t, d, err := p.c.CallRaw(msg.TypeCardanoSignMessageInit, init)
 	for err == nil && t == msg.TypeCardanoMessageDataRequest {
 		var req msg.CardanoMessageDataRequest
@@ -762,10 +772,10 @@ func (p *Provider) SignMessage(m hw.SignMessageParams) (hw.SignedMessage, error)
 			return hw.SignedMessage{}, err
 		}
 		end := uint64(req.Offset) + uint64(req.Length)
-		if end > uint64(len(m.Message)) {
+		if end > uint64(len(message)) {
 			return hw.SignedMessage{}, errors.New("trezor: the device asked for data beyond the message")
 		}
-		t, d, err = p.c.CallRaw(msg.TypeCardanoMessageDataResponse, &msg.CardanoMessageDataResponse{Data: m.Message[req.Offset:end]})
+		t, d, err = p.c.CallRaw(msg.TypeCardanoMessageDataResponse, &msg.CardanoMessageDataResponse{Data: message[req.Offset:end]})
 	}
 	if err != nil {
 		return hw.SignedMessage{}, err

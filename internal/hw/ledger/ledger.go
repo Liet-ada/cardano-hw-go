@@ -16,6 +16,7 @@ import (
 
 	"github.com/Liet-ada/cardano-hw-go/internal/cardano"
 	"github.com/Liet-ada/cardano-hw-go/internal/hw"
+	"github.com/Liet-ada/cardano-hw-go/internal/js"
 	"github.com/Liet-ada/cardano-hw-go/internal/ledger"
 	"github.com/Liet-ada/cardano-hw-go/internal/tx"
 )
@@ -707,8 +708,8 @@ func isASCII(m []byte) bool {
 
 func (p *Provider) SignMessage(m hw.SignMessageParams) (hw.SignedMessage, error) {
 	req := ledger.MessageRequest{
-		Message: m.Message, SigningPath: m.SigningFile.Path, HashPayload: m.HashPayload,
-		IsASCII: isASCII(m.Message) && !m.PreferHexDisplay,
+		MessageHex: m.MessageHex, SigningPath: m.SigningFile.Path, HashPayload: m.HashPayload,
+		IsASCII: isASCII(js.BufferFromHex(m.MessageHex)) && !m.PreferHexDisplay,
 	}
 	var addr []byte
 	if m.Address != "" {

@@ -423,6 +423,21 @@ func validateSignRequest(req *SignRequest) error {
 	return nil
 }
 
+// isHexString is ledgerjs's isHexString: an even number of hex digits, in
+// either case.
+func isHexString(s string) bool {
+	if len(s)%2 != 0 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F') {
+			return false
+		}
+	}
+	return true
+}
+
 // validateAddress makes ledgerjs's checks of address parameters: the
 // spending and staking parts the address type needs.
 func validateAddress(p AddressParams) error {

@@ -116,7 +116,9 @@ type CIP36Params struct {
 
 // SignMessageParams describe a CIP-8 message signature.
 type SignMessageParams struct {
-	Message          []byte
+	// MessageHex is the message in hex as given, which each device's
+	// library checks in its own way
+	MessageHex       string
 	SigningFile      cardano.SigningFile
 	HashPayload      bool
 	PreferHexDisplay bool

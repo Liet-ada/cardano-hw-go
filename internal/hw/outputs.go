@@ -12,6 +12,7 @@ import (
 
 	"github.com/Liet-ada/cardano-hw-go/internal/cardano"
 	"github.com/Liet-ada/cardano-hw-go/internal/cbor"
+	"github.com/Liet-ada/cardano-hw-go/internal/js"
 )
 
 // Errors with cardano-hw-cli's wording.
@@ -149,7 +150,9 @@ type SignedMessageOutput struct {
 }
 
 // NewSignedMessageOutput builds the COSE structures of a message signature.
-func NewSignedMessageOutput(message []byte, hashed bool, s SignedMessage) SignedMessageOutput {
+// The message is written in hex as it was given.
+func NewSignedMessageOutput(messageHex string, hashed bool, s SignedMessage) SignedMessageOutput {
+	message := js.BufferFromHex(messageHex)
 	coseKey := cbor.NewMap(
 		cbor.Entry{Key: cbor.NewUint(1), Value: cbor.NewUint(1)},
 		cbor.Entry{Key: cbor.NewUint(3), Value: cbor.NewInt(-8)},
@@ -173,7 +176,7 @@ func NewSignedMessageOutput(message []byte, hashed bool, s SignedMessage) Signed
 		cbor.NewBytes(s.Signature),
 	)
 	return SignedMessageOutput{
-		MessageHex:   hex.EncodeToString(message),
+		MessageHex:   messageHex,
 		IsHashed:     hashed,
 		AddressHex:   hex.EncodeToString(s.Address),
 		SignatureHex: hex.EncodeToString(s.Signature),

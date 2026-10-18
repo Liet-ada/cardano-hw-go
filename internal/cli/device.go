@@ -621,21 +621,15 @@ func (a *App) cip36(p *args) error {
 }
 
 func (a *App) signMessage(p *args) error {
-	var message []byte
+	// the hex as given: the device's library checks it
+	messageHex, _ := p.get("messageHex")
 	if m, ok := p.get("message"); ok {
 		for i := 0; i < len(m); i++ {
 			if m[i] > 0x7f {
 				return errInvalidMessage
 			}
 		}
-		message = []byte(m)
-	} else {
-		h, _ := p.get("messageHex")
-		b, err := hex.DecodeString(h)
-		if err != nil {
-			return fmt.Errorf("invalid message hex: %w", err)
-		}
-		message = b
+		messageHex = hex.EncodeToString([]byte(m))
 	}
 	fp, _ := p.get("hwSigningFileData")
 	sf, err := cardano.ReadSigningFile(fp)
@@ -652,7 +646,7 @@ func (a *App) signMessage(p *args) error {
 	}
 	address, _ := p.get("address")
 	params := hw.SignMessageParams{
-		Message: message, SigningFile: sf, HashPayload: p.flags["hashPayload"],
+		MessageHex: messageHex, SigningFile: sf, HashPayload: p.flags["hashPayload"],
 		PreferHexDisplay: p.flags["preferHexDisplay"], Address: address, AddressFiles: addrFiles, DerivationType: dt,
 	}
 	return a.withDevice(func(d hw.Provider) error {
@@ -661,6 +655,6 @@ func (a *App) signMessage(p *args) error {
 			return err
 		}
 		out, _ := p.get("outFile")
-		return a.write(out, hw.NewSignedMessageOutput(message, params.HashPayload, s))
+		return a.write(out, hw.NewSignedMessageOutput(messageHex, params.HashPayload, s))
 	})
 }

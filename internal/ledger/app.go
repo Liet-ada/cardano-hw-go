@@ -5,6 +5,7 @@ package ledger
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -326,7 +327,7 @@ func (a *App) SignOperationalCertificate(c OperationalCertificate) ([]byte, erro
 
 // MessageRequest asks for a CIP-8 message signature.
 type MessageRequest struct {
-	Message     []byte
+	MessageHex  string // as given, checked as ledgerjs checks it
 	SigningPath cardano.Path
 	HashPayload bool
 	IsASCII     bool
@@ -340,6 +341,11 @@ type SignedMessage struct {
 
 // SignMessage signs a CIP-8 message.
 func (a *App) SignMessage(m MessageRequest) (*SignedMessage, error) {
+	// in the order ledgerjs parses the request
+	if !isHexString(m.MessageHex) {
+		return nil, invalidData("CIP-8 message signing: invalid message hex string")
+	}
+	msg, _ := hex.DecodeString(m.MessageHex)
 	if m.Address != nil {
 		if err := validateAddress(*m.Address); err != nil {
 			return nil, err
@@ -361,7 +367,7 @@ func (a *App) SignMessage(m MessageRequest) (*SignedMessage, error) {
 		}
 		return u8(0)
 	}
-	init := cat(u32(uint32(len(m.Message))), pathBytes(m.SigningPath), flag(m.HashPayload), flag(m.IsASCII))
+	init := cat(u32(uint32(len(msg))), pathBytes(m.SigningPath), flag(m.HashPayload), flag(m.IsASCII))
 	if m.Address != nil {
 		p, err := addressParamsBytes(*m.Address)
 		if err != nil {
@@ -378,7 +384,6 @@ func (a *App) SignMessage(m MessageRequest) (*SignedMessage, error) {
 		_, err := a.send(insSignMessage, 0x02, 0, cat(u32(uint32(len(b))), b), 0)
 		return err
 	}
-	msg := m.Message
 	if v.v7() {
 		first := 99
 		if m.IsASCII {
