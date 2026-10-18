@@ -355,7 +355,12 @@ func (d *decoder) stringBytes(major, info byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, d.data[d.pos:d.pos+n]...)
+		chunk := d.data[d.pos : d.pos+n]
+		// a character cannot be split between chunks (RFC 8949, 3.2.3)
+		if major == majorText && !utf8.Valid(chunk) {
+			return nil, &DecodeError{chunkAt, "invalid UTF-8 in text string"}
+		}
+		out = append(out, chunk...)
 		d.pos += n
 	}
 	d.pos++

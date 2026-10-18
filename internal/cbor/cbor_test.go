@@ -107,6 +107,7 @@ func TestDecodeErrors(t *testing.T) {
 		{"a201000100", "duplicate map key"},
 		{"a2410001410002", "duplicate map key"},
 		{"62c328", "invalid UTF-8"},
+		{"7f61c361a9ff", "invalid UTF-8"}, // a character split between chunks
 		{"5f4101610200ff", "invalid chunk"},
 		{"5f5f4101ffff", "invalid chunk"},
 		{"ff", "unexpected break"},
