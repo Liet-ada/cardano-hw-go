@@ -41,7 +41,7 @@ Environment variables:
 |---|---|
 | `CARDANO_HW_GO_DEVICE` | `trezor`, `ledger` or `keystone`, when several devices are connected |
 | `CARDANO_HW_GO_THP_STORE` | file of THP credentials (default: the user config directory) |
-| `CARDANO_HW_GO_HOST_NAME` | host name the Trezor shows when pairing |
+| `CARDANO_HW_GO_HOST_NAME` | host name the Trezor shows when pairing and keeps among its paired hosts (default: `cardano-hw-go`, not the computer's name) |
 | `CARDANO_HW_GO_TREZOR_EMULATOR` | `host:port` of the Trezor emulator instead of USB |
 | `CARDANO_HW_GO_LEDGER_SPECULOS` | `host:port` of the APDU port of the Speculos emulator (or `internal/ledger/ledgersim`) instead of a USB Ledger |
 | `CARDANO_HW_GO_DEBUGLINK` | `1` to answer the emulator's screens through its debug link (tests only) |

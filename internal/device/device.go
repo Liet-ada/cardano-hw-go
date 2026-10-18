@@ -33,6 +33,11 @@ const (
 	EnvStore = "CARDANO_HW_GO_THP_STORE"
 	// EnvHostName overrides the host name the Trezor shows when pairing.
 	EnvHostName = "CARDANO_HW_GO_HOST_NAME"
+
+	// defaultHostName is the host name the Trezor shows and keeps among its
+	// paired hosts. It is not the computer's, which may hold the name of
+	// its owner.
+	defaultHostName = "cardano-hw-go"
 )
 
 // ErrNoDevice is cardano-hw-cli's error when it finds no hardware wallet.
@@ -58,10 +63,7 @@ func (o *Opener) trezorOptions(ui trezor.UI) (trezor.Options, error) {
 	}
 	host := os.Getenv(EnvHostName)
 	if host == "" {
-		host, _ = os.Hostname()
-	}
-	if host == "" {
-		host = "this computer"
+		host = defaultHostName
 	}
 	return trezor.Options{
 		UI: ui, Store: &FileStore{Path: path}, HostName: host, AppName: "cardano-hw-go",
