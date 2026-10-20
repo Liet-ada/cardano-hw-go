@@ -34,14 +34,14 @@ cardano-hw-go address key-gen --path 1852H/1815H/0H/0/0 --hw-signing-file paymen
 cardano-hw-go transaction witness --testnet-magic 1 --tx-file tx.raw --hw-signing-file payment.hwsfile --out-file payment.witness
 ```
 
-A Ledger needs the Cardano app 7.0 or newer, open on the device; close Ledger Live while signing. The first time it connects to a Trezor that uses THP, it pairs with the six-digit code the Trezor shows, asked on the terminal. It then keeps a pairing credential, which holds no wallet key, in the login keychain on macOS (elsewhere, in a file only its owner can read): every action still needs confirmation on the device. Close Trezor Suite while signing, since it holds the USB interface.
+A Ledger needs the Cardano app 7.0 or newer, open on the device; close Ledger Live while signing. The first time it connects to a Trezor that uses THP, it pairs with the six-digit code the Trezor shows, asked on the terminal. It then keeps a pairing credential, which holds no wallet key, in a file only its owner can read (left out of Time Machine backups on macOS): every action still needs confirmation on the device. Close Trezor Suite while signing, since it holds the USB interface.
 
 Environment variables:
 
 | Variable | Use |
 |---|---|
 | `CARDANO_HW_GO_DEVICE` | `trezor`, `ledger` or `keystone`, when several devices are connected |
-| `CARDANO_HW_GO_THP_STORE` | a file to keep THP credentials in instead (default: the keychain on macOS, the user config directory elsewhere) |
+| `CARDANO_HW_GO_THP_STORE` | file of THP credentials (default: the user config directory) |
 | `CARDANO_HW_GO_HOST_NAME` | host name the Trezor shows when pairing and keeps among its paired hosts (default: `cardano-hw-go`, not the computer's name) |
 
 Only builds with `-tags emulators` (`make build-emulators`), for tests, know these; no environment variable can point the normal binary at a device that is not on USB:

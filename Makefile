@@ -20,8 +20,7 @@ test:
 
 # Tests against the Trezor emulator, started with the "all all ..." seed
 # (emu.py --slip0014); not part of check. One package at a time, as they
-# share the emulator. With CARDANO_HW_GO_KEYCHAIN_TEST=1 they also pair
-# through the login keychain, under a service of their own they remove.
+# share the emulator.
 emulator:
 	TREZOR_EMULATOR=$(TREZOR_EMULATOR) $(GO) test -tags emulators -p 1 -count=1 -run Emulator -v ./...
 

@@ -13,14 +13,12 @@ import (
 
 	"github.com/Liet-ada/cardano-hw-go/internal/hw"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor"
-	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/wire"
 )
 
 // Environment variables.
 const (
-	// EnvStore names a file to keep THP credentials in, instead of the
-	// keychain on macOS or a file in the user config directory elsewhere.
+	// EnvStore overrides where THP credentials are kept.
 	EnvStore = "CARDANO_HW_GO_THP_STORE"
 	// EnvHostName overrides the host name the Trezor shows when pairing.
 	EnvHostName = "CARDANO_HW_GO_HOST_NAME"
@@ -44,20 +42,20 @@ type Opener struct {
 }
 
 func (o *Opener) trezorOptions(ui trezor.UI) (trezor.Options, error) {
-	var store thp.Store = &FileStore{Path: os.Getenv(EnvStore)}
-	if os.Getenv(EnvStore) == "" {
-		s, err := defaultStore()
+	path := os.Getenv(EnvStore)
+	if path == "" {
+		p, err := DefaultStorePath()
 		if err != nil {
 			return trezor.Options{}, err
 		}
-		store = s
+		path = p
 	}
 	host := os.Getenv(EnvHostName)
 	if host == "" {
 		host = defaultHostName
 	}
 	return trezor.Options{
-		UI: ui, Store: store, HostName: host, AppName: "cardano-hw-go",
+		UI: ui, Store: &FileStore{Path: path}, HostName: host, AppName: "cardano-hw-go",
 		Timeout: actionTimeout,
 	}, nil
 }

@@ -15,11 +15,10 @@ import (
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
 )
 
-// FileStore keeps THP credentials in a file only its owner can read, where
-// there is no keychain (or CARDANO_HW_GO_THP_STORE names one). A
-// credential lets this host reopen a channel without the pairing code; it
-// is not a key of the wallet, and every action still needs the person on
-// the Trezor.
+// FileStore keeps THP credentials in a file only its owner can read, left
+// out of Time Machine on macOS. A credential lets this host reopen a
+// channel without the pairing code; it is not a key of the wallet, and
+// every action still needs the person on the Trezor.
 type FileStore struct {
 	Path string
 	mu   sync.Mutex
@@ -31,8 +30,7 @@ type storedCredential struct {
 	Credential            string `json:"credential"`
 }
 
-// DefaultStorePath is the file of the credentials where there is no
-// keychain.
+// DefaultStorePath is where the credentials are kept by default.
 func DefaultStorePath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -104,5 +102,6 @@ func (s *FileStore) Save(c thp.Credential) error {
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
+	excludeFromBackup(tmp)
 	return os.Rename(tmp, s.Path)
 }
