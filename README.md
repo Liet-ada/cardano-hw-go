@@ -12,7 +12,7 @@ A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-
 | Trezor (THP and Codec v1) | All commands pass against the Trezor Safe 7 emulator |
 | USB on macOS (IOKit) | Builds; not yet tested on a device |
 | Keystone | Not started |
-| Linux (usbfs, hidraw) | Not started |
+| USB on Linux (usbfs, hidraw) | Builds; device listing and descriptors tested on sample sysfs trees; not yet tested on a device |
 
 ## Build
 
@@ -23,7 +23,7 @@ make build   # bin/cardano-hw-go
 make build-emulators   # bin/emulators/cardano-hw-go, which also opens emulators (tests only)
 ```
 
-Requires Go 1.26.8 or newer. On macOS, cgo links only the system's IOKit and CoreFoundation frameworks.
+Requires Go 1.26.8 or newer. On macOS, cgo links only the system's IOKit and CoreFoundation frameworks; on Linux it builds without cgo.
 
 ## Use
 
@@ -34,7 +34,7 @@ cardano-hw-go address key-gen --path 1852H/1815H/0H/0/0 --hw-signing-file paymen
 cardano-hw-go transaction witness --testnet-magic 1 --tx-file tx.raw --hw-signing-file payment.hwsfile --out-file payment.witness
 ```
 
-A Ledger needs the Cardano app 7.0 or newer, open on the device; close Ledger Live while signing. The first time it connects to a Trezor that uses THP, it pairs with the six-digit code the Trezor shows, asked on the terminal. It then keeps a pairing credential, which holds no wallet key, in a file only its owner can read (left out of Time Machine backups on macOS): every action still needs confirmation on the device. Close Trezor Suite while signing, since it holds the USB interface.
+A Ledger needs the Cardano app 7.0 or newer, open on the device; close Ledger Live while signing. The first time it connects to a Trezor that uses THP, it pairs with the six-digit code the Trezor shows, asked on the terminal. It then keeps a pairing credential, which holds no wallet key, in a file only its owner can read (left out of Time Machine backups on macOS): every action still needs confirmation on the device. Close Trezor Suite while signing, since it holds the USB interface. On Linux, the user needs access to the devices: install the udev rules Trezor and Ledger publish (`51-trezor.rules`, `20-hw1.rules`).
 
 Environment variables:
 
