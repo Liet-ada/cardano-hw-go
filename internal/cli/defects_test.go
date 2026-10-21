@@ -68,7 +68,9 @@ func metadataTx(x string) string {
 // emulatorDefects are tested against the Trezor emulator, by the
 // subtests of TestEmulatorFlows named here.
 var emulatorDefects = map[string]string{
-	"trezor-address-not-checked": "show address",
+	"trezor-address-not-checked":       "show address",
+	"trezor-key-failure-as-cancel":     "key path refused",
+	"trezor-address-cancel-as-invalid": "rejections",
 }
 
 var defectCases = []defectCase{

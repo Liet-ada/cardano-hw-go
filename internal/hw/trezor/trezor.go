@@ -39,6 +39,34 @@ var (
 	ErrMessagePayloadNotHex = errors.New(`Message payload must be a hexadecimal string without a "0x" prefix.`)
 )
 
+// failure is a failure of the Trezor in trezor-connect's words, which
+// cardano-hw-cli prints: the device's message, or one for its code.
+type failure struct{ f *trezor.Failure }
+
+func (e failure) Error() string {
+	switch {
+	case e.f.Message != "":
+		return e.f.Message
+	case e.f.Code == msg.FailureFirmwareError:
+		return "Firmware installation failed"
+	case e.f.Code == msg.FailureActionCancelled:
+		return "Action cancelled by user"
+	}
+	return "Failure_UnknownMessage"
+}
+
+func (e failure) Unwrap() error { return e.f }
+
+// deviceError words err as trezor-connect does when it is a failure of the
+// Trezor.
+func deviceError(err error) error {
+	var f *trezor.Failure
+	if errors.As(err, &f) {
+		return failure{f}
+	}
+	return err
+}
+
 // chunkSize is the size of the chunks of inline datums and reference
 // scripts.
 const chunkSize = 1024
@@ -96,7 +124,9 @@ func (p *Provider) XPubKeys(paths []cardano.Path, dt hw.DerivationType) ([][]byt
 			return nil, ErrXPubKeyCancelled
 		}
 		if err != nil {
-			return nil, err
+			// a path the Trezor refuses is no cancellation (cardano-hw-cli
+			// defect trezor-key-failure-as-cancel)
+			return nil, deviceError(err)
 		}
 		if len(r.Node.PublicKey) != 32 || len(r.Node.ChainCode) != 32 {
 			return nil, errors.New("trezor: invalid public key")
@@ -123,10 +153,16 @@ func (p *Provider) ShowAddress(a hw.ShowAddressParams) error {
 		ShowDisplay: boolPtr(true), ProtocolMagic: attrs.ProtocolMagic, NetworkID: attrs.NetworkID,
 		AddressParameters: params, DerivationType: derivation(a.DerivationType),
 	}, msg.TypeCardanoAddress, &r); err != nil {
-		if trezor.Cancelled(err) {
-			return err
+		var f *trezor.Failure
+		switch {
+		case trezor.Cancelled(err):
+			// a rejection on the Trezor is no invalid parameter
+			// (cardano-hw-cli defect trezor-address-cancel-as-invalid)
+			return deviceError(err)
+		case errors.As(err, &f):
+			return ErrInvalidAddressParameters
 		}
-		return fmt.Errorf("%w: %v", ErrInvalidAddressParameters, err)
+		return err
 	}
 	// the device derives the address itself: it must be the one given
 	// (cardano-hw-cli defect trezor-address-not-checked)
@@ -609,7 +645,7 @@ func (p *Provider) WitnessTx(params hw.TxSigningParams, change []cardano.Signing
 	b := &txBuilder{params: params, change: change}
 	responses, hash, _, err := p.signTx(b, nil)
 	if err != nil {
-		return nil, err
+		return nil, deviceError(err)
 	}
 	if !bytes.Equal(hash, params.BodyHash) {
 		return nil, hw.ErrTxSerializationMismatch
@@ -670,7 +706,7 @@ func (p *Provider) SignCIP36Registration(r hw.CIP36Params) ([]byte, error) {
 	d := &dummyTx{p: p, network: r.Network, dt: r.DerivationType}
 	supplement, err := d.sign(&msg.CardanoTxAuxiliaryData{CVoteRegistrationParameters: params})
 	if err != nil {
-		return nil, err
+		return nil, deviceError(err)
 	}
 	if supplement == nil {
 		return nil, ErrMissingAuxDataSupplement
@@ -779,7 +815,7 @@ func (p *Provider) SignMessage(m hw.SignMessageParams) (hw.SignedMessage, error)
 		t, d, err = p.c.CallRaw(msg.TypeCardanoMessageDataResponse, &msg.CardanoMessageDataResponse{Data: message[req.Offset:end]})
 	}
 	if err != nil {
-		return hw.SignedMessage{}, err
+		return hw.SignedMessage{}, deviceError(err)
 	}
 	if t != msg.TypeCardanoMessageSignature {
 		return hw.SignedMessage{}, fmt.Errorf("trezor: unexpected message type %d", t)
@@ -830,7 +866,7 @@ func (p *Provider) NativeScriptHash(s cardano.NativeScript, files []cardano.Sign
 	if err := p.c.Call(msg.TypeCardanoGetNativeScriptHash, &msg.CardanoGetNativeScriptHash{
 		Script: nativeScript(s, files), DisplayFormat: format, DerivationType: derivation(dt),
 	}, msg.TypeCardanoNativeScriptHash, &r); err != nil {
-		return nil, err
+		return nil, deviceError(err)
 	}
 	return r.ScriptHash, nil
 }

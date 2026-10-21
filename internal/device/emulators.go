@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Liet-ada/cardano-hw-go/internal/hw"
 	hwtrezor "github.com/Liet-ada/cardano-hw-go/internal/hw/trezor"
@@ -28,7 +29,8 @@ const (
 	// of a USB device.
 	EnvTrezorEmulator = "CARDANO_HW_GO_TREZOR_EMULATOR"
 	// EnvDebugLink, set to 1 with the emulator, answers for the person
-	// through its debug link: pairing code and confirmations.
+	// through its debug link: pairing code and confirmations. Set to
+	// reject, it refuses the screens of the operation instead.
 	EnvDebugLink = "CARDANO_HW_GO_DEBUGLINK"
 	// EnvLedgerSpeculos points to the APDU port (host:port) of the
 	// Speculos emulator, or of a simulator speaking its protocol, instead
@@ -62,7 +64,7 @@ func (o *Opener) openTrezorEmulator(addr string) (hw.Provider, error) {
 		return nil, fmt.Errorf("no Trezor emulator at %s", addr)
 	}
 	var ui trezor.UI = &TerminalUI{Messages: o.Messages}
-	if os.Getenv(EnvDebugLink) == "1" {
+	if v := os.Getenv(EnvDebugLink); v == "1" || v == "reject" {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
@@ -75,7 +77,7 @@ func (o *Opener) openTrezorEmulator(addr string) (hw.Provider, error) {
 		if err != nil {
 			return nil, err
 		}
-		ui = &DebugUI{Debug: d}
+		ui = &DebugUI{Debug: d, Reject: v == "reject"}
 	}
 	opts, err := o.trezorOptions(ui)
 	if err != nil {
@@ -92,6 +94,9 @@ func (o *Opener) openTrezorEmulator(addr string) (hw.Provider, error) {
 // DebugUI answers for the person through the emulator's debug link.
 type DebugUI struct {
 	Debug *debuglink.Debug
+	// Reject refuses the screens of the operation, still pairing and
+	// connecting.
+	Reject bool
 }
 
 // PairingCode asks the emulator for the code it shows.
@@ -99,7 +104,9 @@ func (u *DebugUI) PairingCode(info thp.PairingInfo) (string, error) {
 	return u.Debug.PairingCode(info)
 }
 
-// ButtonRequest presses yes on the emulator.
-func (u *DebugUI) ButtonRequest(uint32, string) {
-	go u.Debug.PressYesSoon()
+// ButtonRequest presses yes on the emulator, or no when rejecting a screen
+// that is not one of THP's.
+func (u *DebugUI) ButtonRequest(code uint32, name string) {
+	yes := !u.Reject || strings.HasPrefix(name, "thp_")
+	go u.Debug.PressSoon(yes)
 }

@@ -336,6 +336,49 @@ func TestEmulatorFlows(t *testing.T) {
 		}
 	})
 
+	t.Run("key path refused", func(t *testing.T) {
+		code, out := e.run("address", "key-gen", "--path", "1694H/1815H/0H/0/0",
+			"--hw-signing-file", e.path("vote.hwsfile"), "--verification-key-file", e.path("vote.vkey"))
+		if code != 1 || out != "Error: Forbidden key path\n" {
+			t.Fatalf("exit %d: %q", code, out)
+		}
+	})
+
+	t.Run("rejections", func(t *testing.T) {
+		t.Setenv(device.EnvDebugLink, "reject")
+		addr, _ := cardano.EncodeAddress(own)
+		os.WriteFile(e.path("own.addr"), []byte(addr+"\n"), 0o600)
+		body := mp(u(0), arr(input(0xaa, 0)), u(1), arr(arr(b(other), u(1500000))), u(2), u(170000), u(3), u(1000))
+		txFile := e.writeTx("rejected", arr(body, mp(), cbor.NewBool(true), cbor.Null))
+		for _, c := range []struct {
+			args []string
+			want string
+		}{
+			{[]string{"address", "key-gen", "--path", "1852H/1815H/0H/0/1",
+				"--hw-signing-file", e.path("r.hwsfile"), "--verification-key-file", e.path("r.vkey")},
+				"Error: Extended public key export cancelled by user\n"},
+			{[]string{"address", "show", "--payment-path", "1852H/1815H/0H/0/0", "--staking-path", "1852H/1815H/0H/2/0",
+				"--address-file", e.path("own.addr")},
+				"Error: Cancelled\n"},
+			{[]string{"message", "sign", "--message", "no", "--signing-path-hwsfile", e.path("payment.hwsfile"),
+				"--out-file", e.path("r.json")},
+				"Error: Cancelled\n"},
+			{[]string{"transaction", "witness", "--testnet-magic", "1", "--tx-file", txFile,
+				"--hw-signing-file", e.path("payment.hwsfile"), "--out-file", e.path("r.witness")},
+				"Error: Cancelled\n"},
+		} {
+			code, out := e.run(c.args...)
+			if code != 1 || !strings.HasSuffix(out, c.want) {
+				t.Errorf("%s %s: exit %d: %q, want %q at the end", c.args[0], c.args[1], code, out, c.want)
+			}
+		}
+		for _, name := range []string{"r.hwsfile", "r.vkey", "r.json", "r.witness"} {
+			if _, err := os.Stat(e.path(name)); err == nil {
+				t.Errorf("%s written after a rejection", name)
+			}
+		}
+	})
+
 	t.Run("operational certificate unsupported", func(t *testing.T) {
 		// Trezor exports no pool cold keys either: write the files by hand
 		cold := cardano.SigningFileOutput{Type: "StakePoolHWSigningFile_ed25519", Description: "", Path: "1853H/1815H/0H/0H",

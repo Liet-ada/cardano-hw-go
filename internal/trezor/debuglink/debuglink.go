@@ -78,9 +78,13 @@ func (d *Debug) PairingCode(info thp.PairingInfo) (string, error) {
 }
 
 // PressYes confirms the screen the emulator shows.
-func (d *Debug) PressYes() error {
-	yes := uint32(msg.DebugButtonYes)
-	data, err := pb.Marshal(&msg.DebugLinkDecision{Button: &yes})
+func (d *Debug) PressYes() error { return d.press(msg.DebugButtonYes) }
+
+// PressNo refuses the screen the emulator shows.
+func (d *Debug) PressNo() error { return d.press(msg.DebugButtonNo) }
+
+func (d *Debug) press(button uint32) error {
+	data, err := pb.Marshal(&msg.DebugLinkDecision{Button: &button})
 	if err != nil {
 		return err
 	}
@@ -89,10 +93,15 @@ func (d *Debug) PressYes() error {
 	return d.conn.Write(msg.TypeDebugLinkDecision, data)
 }
 
-// PressYesSoon confirms the screen after it had time to appear.
-func (d *Debug) PressYesSoon() {
+// PressSoon confirms the screen, or refuses it, after it had time to
+// appear.
+func (d *Debug) PressSoon(yes bool) {
 	time.Sleep(300 * time.Millisecond)
-	d.PressYes()
+	if yes {
+		d.PressYes()
+	} else {
+		d.PressNo()
+	}
 }
 
 // Layout returns the text of the current screen.

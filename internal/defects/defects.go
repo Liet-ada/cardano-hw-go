@@ -7,9 +7,10 @@
 // cardano-hw-go prints, writes and returns what cardano-hw-cli
 // 1.20.0-beta.4 does, quirks included. A defect is an input cardano-hw-cli
 // mishandles: it crashes with a JavaScript error instead of giving the
-// error it has for the case, or it goes on with a value it should refuse
-// and fails later, at the device or not at all. There cardano-hw-go does
-// what cardano-hw-cli means to do.
+// error it has for the case, it goes on with a value it should refuse
+// and fails later, at the device or not at all, or it reports what the
+// device answers as something else. There cardano-hw-go does what
+// cardano-hw-cli means to do.
 //
 // The code that departs from cardano-hw-cli for a defect says so in a
 // comment, "cardano-hw-cli defect <id>". The tests that compare
@@ -98,8 +99,18 @@ var All = []Defect{
 	},
 	{
 		ID:    "trezor-message-hex-odd-length",
-		HWCLI: "message sign with a Trezor passes on a message hex of an odd number of digits, which trezor-connect lets through, and asks the device for a message of a fractional size",
+		HWCLI: "message sign with a Trezor passes on a message hex of an odd number of digits, which trezor-connect's check lets through; trezor-connect then takes it for a message of a fractional size, and its protobuf encoder refuses that with a RangeError about the safe integer range, before anything reaches the device",
 		Here:  "trezor-connect's error for a message that is not hex",
+	},
+	{
+		ID:    "trezor-key-failure-as-cancel",
+		HWCLI: "address key-gen and node key-gen with a Trezor report any failure of the export as cancelled by the user, even a path the device refuses",
+		Here:  "the device's message, as for the other commands",
+	},
+	{
+		ID:    "trezor-address-cancel-as-invalid",
+		HWCLI: "address show with a Trezor reports a rejection on the device as invalid address parameters",
+		Here:  "the device's message for the rejection, as for the other commands",
 	},
 	{
 		ID:    "number-out-of-range",
