@@ -10,6 +10,7 @@ package usb
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <IOKit/IOKitLib.h>
@@ -147,8 +148,15 @@ static IOReturn hw_hid_open(UInt64 id, hw_hid **out) {
 	return kIOReturnSuccess;
 }
 
+// A synchronous report ends with kIOReturnAborted when its thread takes a
+// signal, and the Go runtime signals its threads: block them meanwhile.
 static IOReturn hw_hid_write(hw_hid *h, const uint8_t *buf, CFIndex len) {
-	return IOHIDDeviceSetReport(h->dev, kIOHIDReportTypeOutput, 0, buf, len);
+	sigset_t all, old;
+	sigfillset(&all);
+	pthread_sigmask(SIG_BLOCK, &all, &old);
+	IOReturn r = IOHIDDeviceSetReport(h->dev, kIOHIDReportTypeOutput, 0, buf, len);
+	pthread_sigmask(SIG_SETMASK, &old, NULL);
+	return r;
 }
 
 // hw_hid_read waits up to timeout_ms (0: forever) for a report; it returns

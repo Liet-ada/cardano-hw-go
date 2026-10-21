@@ -7,6 +7,8 @@ package usb
 
 /*
 #cgo LDFLAGS: -framework IOKit -framework CoreFoundation
+#include <pthread.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <IOKit/IOKitLib.h>
@@ -195,12 +197,24 @@ static IOReturn hw_raw_open(UInt32 location, UInt8 number, hw_raw **out) {
 	return kIOReturnSuccess;
 }
 
+// A synchronous transfer ends with kIOReturnAborted when its thread takes
+// a signal, and the Go runtime signals its threads: block them meanwhile.
 static IOReturn hw_raw_write(hw_raw *h, void *buf, UInt32 len) {
-	return (*h->intf)->WritePipe(h->intf, h->pipeOut, buf, len);
+	sigset_t all, old;
+	sigfillset(&all);
+	pthread_sigmask(SIG_BLOCK, &all, &old);
+	IOReturn r = (*h->intf)->WritePipe(h->intf, h->pipeOut, buf, len);
+	pthread_sigmask(SIG_SETMASK, &old, NULL);
+	return r;
 }
 
 static IOReturn hw_raw_read(hw_raw *h, void *buf, UInt32 *len) {
-	return (*h->intf)->ReadPipe(h->intf, h->pipeIn, buf, len);
+	sigset_t all, old;
+	sigfillset(&all);
+	pthread_sigmask(SIG_BLOCK, &all, &old);
+	IOReturn r = (*h->intf)->ReadPipe(h->intf, h->pipeIn, buf, len);
+	pthread_sigmask(SIG_SETMASK, &old, NULL);
+	return r;
 }
 
 static IOReturn hw_raw_abort(hw_raw *h) {
