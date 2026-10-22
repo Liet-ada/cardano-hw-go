@@ -37,10 +37,12 @@ fuzz:
 	$(GO) test -run '^$$' -fuzz '^FuzzUnmarshal$$' -fuzztime $(FUZZTIME) ./internal/trezor/pb
 	cd test/cbor-oracle && $(GO) vet . && $(GO) test -run '^$$' -fuzz '^FuzzAgainstFxamacker$$' -fuzztime $(FUZZTIME) .
 
+# Builds use -trimpath: without it, the binary keeps the path of every
+# source file, and with it the user name of whoever built it.
 build:
-	$(GO) build -o bin/ ./cmd/...
+	$(GO) build -trimpath -o bin/ ./cmd/...
 
 # A build that also opens the emulators the environment points to, for
 # tests against cardano-hw-cli; never one to sign with.
 build-emulators:
-	$(GO) build -tags emulators -o bin/emulators/ ./cmd/...
+	$(GO) build -trimpath -tags emulators -o bin/emulators/ ./cmd/...

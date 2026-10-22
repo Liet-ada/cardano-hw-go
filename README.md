@@ -23,7 +23,7 @@ make build   # bin/cardano-hw-go
 make build-emulators   # bin/emulators/cardano-hw-go, which also opens emulators (tests only)
 ```
 
-Requires Go 1.26.8 or newer. On macOS, cgo links only the system's IOKit and CoreFoundation frameworks; on Linux it builds without cgo.
+Requires Go 1.26.8 or newer. On macOS, cgo links only the system's IOKit and CoreFoundation frameworks; on Linux it builds without cgo. The builds use `-trimpath`, which keeps the paths of the build machine, and the user name in them, out of the binary; pass it as well when building with `go build` or `go install`.
 
 ## Use
 
