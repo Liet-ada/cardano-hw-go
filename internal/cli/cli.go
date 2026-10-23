@@ -30,7 +30,7 @@ const (
 	ExitFixableIssues      = 3
 	exitUsage              = 2
 	prog                   = "cardano-hw-cli"
-	Version                = "0.1.0-dev"
+	Version                = "0.1.0"
 	compatibleCardanoHWCLI = "1.20.0"
 )
 
