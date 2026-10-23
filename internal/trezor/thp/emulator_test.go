@@ -15,6 +15,7 @@ import (
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/msg"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/pb"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
+	v1 "github.com/Liet-ada/cardano-hw-go/internal/trezor/v1"
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/wire"
 )
 
@@ -81,7 +82,38 @@ func emulator(t *testing.T) (string, *debuglink.Debug) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Close() })
+	if !speaksTHP(t, addr) {
+		t.Skip("the emulator does not speak THP (a Model T, Safe 3 or Safe 5)")
+	}
 	return addr, d
+}
+
+// speaksTHP asks with a Codec v1 message, which a THP Trezor refuses as an
+// invalid protocol.
+func speaksTHP(t *testing.T, addr string) bool {
+	link, err := wire.DialUDP(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer link.Close()
+	c := &v1.Conn{Link: link}
+	if err := c.Write(msg.TypeCancel, nil); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		typ, data, err := c.Read(5 * time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if typ != msg.TypeFailure {
+			continue
+		}
+		var f msg.Failure
+		if err := pb.Unmarshal(data, &f); err != nil {
+			t.Fatal(err)
+		}
+		return f.Code != nil && *f.Code == msg.FailureInvalidProtocol
+	}
 }
 
 func itoa(n int) string {

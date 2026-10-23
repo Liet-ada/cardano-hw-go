@@ -1,6 +1,6 @@
 # cardano-hw-go
 
-A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-hw-cli): it signs Cardano transactions with hardware wallets, with the same commands, options, files and exit codes. It supports the Trezor Safe 7, which requires the Trezor Host Protocol (THP).
+A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-hw-cli): it signs Cardano transactions with hardware wallets, with the same commands, options, files and exit codes. It supports the Trezor Safe 7, which requires the Trezor Host Protocol (THP), as well as the Trezors that speak Codec v1 (Model T, Safe 3, Safe 5).
 
 **Status:** under construction. Not ready for real funds.
 
@@ -8,11 +8,11 @@ A Go reimplementation of [cardano-hw-cli](https://github.com/vacuumlabs/cardano-
 |---|---|
 | Command line | Same help, usage and errors as cardano-hw-cli 1.20.0-beta.4, including how it reads and checks the files it is given |
 | `transaction validate`, `transaction transform` | Same output as cardano-hw-cli 1.20.0-beta.4 on 5508 test transactions and on 30 of mainnet and preprod |
-| Ledger (Cardano app v7 and v8) | Same output, files and APDUs as cardano-hw-cli 1.20.0-beta.4 against a simulated Ledger, on its Ledger test cases (whose keys and signatures come from a real device), on 30 transactions of mainnet and preprod and 1836 more; not yet tested on a device |
-| Trezor (THP and Codec v1) | All commands pass against the Trezor Safe 7 emulator; on a Trezor Safe 7 (firmware 2.12.5), pairing, `device version`, `address key-gen`, `address show` and `transaction witness` on preprod work, and the witness verifies |
-| USB on macOS (IOKit) | Tested with a Trezor Safe 7; HID (Ledger) not yet tested on a device |
+| Ledger (Cardano app v7 and v8) | Same output, files and APDUs as cardano-hw-cli 1.20.0-beta.4 against a simulated Ledger, on its Ledger test cases (whose keys and signatures come from a real device), on 30 transactions of mainnet and preprod and 1836 more. On a Ledger Nano S (app 7.1.4), every command it supports gives the same keys, witnesses and errors as cardano-hw-cli; app v8 not yet tested on a device |
+| Trezor (THP and Codec v1) | All commands pass against the emulators of the Trezor Safe 7 (THP) and of the Model T, Safe 3 and Safe 5 (Codec v1), firmware 2.13.0. On a Trezor Safe 7 (firmware 2.12.5), pairing, `device version`, `address key-gen`, `address show`, `transaction witness`, `message sign` and CIP-36 registration on preprod work, and the signatures verify. Codec v1 not yet tested on a device |
+| USB on macOS (IOKit) | Tested with a Trezor Safe 7 and a Ledger Nano S (HID) |
 | Keystone | Not started |
-| USB on Linux (usbfs, hidraw) | Builds; device listing and descriptors tested on sample sysfs trees; not yet tested on a device |
+| USB on Linux (usbfs, hidraw) | hidraw (Ledger) tested with a Ledger Nano S on Ubuntu; usbfs (Trezor) not yet tested on a device |
 
 ## Build
 
@@ -51,6 +51,10 @@ Only builds with `-tags emulators` (`make build-emulators`), for tests, know the
 | `CARDANO_HW_GO_TREZOR_EMULATOR` | `host:port` of the Trezor emulator instead of USB |
 | `CARDANO_HW_GO_LEDGER_SPECULOS` | `host:port` of the APDU port of the Speculos emulator (or `internal/ledger/ledgersim`) instead of a USB Ledger |
 | `CARDANO_HW_GO_DEBUGLINK` | `1` to answer the emulator's screens through its debug link, `reject` to refuse the screens of each operation |
+
+## Check the address on the device
+
+THP authenticates a Trezor Safe 7 with the credential from pairing, but a device posing as a Trezor on the USB path can always present itself as an older Trezor, which speaks Codec v1 without encryption or authentication, and answer with keys of its own. As with any hardware wallet, before receiving funds, show the receiving address on the device (`address show`) and compare it with the one you will use. The private keys never leave the device either way.
 
 ## Differences from cardano-hw-cli
 

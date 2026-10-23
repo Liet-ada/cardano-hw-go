@@ -10,16 +10,22 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/Liet-ada/cardano-hw-go/internal/cardano"
 	"github.com/Liet-ada/cardano-hw-go/internal/cbor"
 	"github.com/Liet-ada/cardano-hw-go/internal/device"
+	"github.com/Liet-ada/cardano-hw-go/internal/trezor"
+	"github.com/Liet-ada/cardano-hw-go/internal/trezor/debuglink"
+	"github.com/Liet-ada/cardano-hw-go/internal/trezor/wire"
 	"github.com/Liet-ada/cardano-hw-go/internal/tx"
 )
 
@@ -45,6 +51,46 @@ func newEmu(t *testing.T) *emu {
 }
 
 func (e *emu) path(name string) string { return filepath.Join(e.dir, name) }
+
+// model returns the internal model of the emulated Trezor (T2T1 for the
+// Model T, T3B1 for the Safe 3, T3W1 for the Safe 7...).
+func (e *emu) model() string {
+	e.t.Helper()
+	addr := os.Getenv("TREZOR_EMULATOR")
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	d, err := debuglink.Dial(net.JoinHostPort(host, strconv.Itoa(p+1)))
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer d.Close()
+	link, err := wire.DialUDP(addr)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer link.Close()
+	c, err := trezor.Connect(link, trezor.Options{UI: &device.DebugUI{Debug: d}, Store: &device.FileStore{Path: e.path("thp.json")},
+		HostName: "cardano-hw-go", AppName: "cardano-hw-go", Timeout: time.Minute})
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	if m := c.Features().InternalModel; m != nil {
+		return *m
+	}
+	return ""
+}
+
+// The Model T and the Safe 3 show a key or an address with a menu, which
+// cancels them; the debug link's "no" does not.
+func cancelsShowByMenu(model string) bool {
+	return model == "T2T1" || model == "T2B1" || model == "T3B1"
+}
 
 // run runs a command and returns its exit code and output.
 func (e *emu) run(args ...string) (int, string) {
@@ -345,6 +391,7 @@ func TestEmulatorFlows(t *testing.T) {
 	})
 
 	t.Run("rejections", func(t *testing.T) {
+		model := e.model()
 		t.Setenv(device.EnvDebugLink, "reject")
 		addr, _ := cardano.EncodeAddress(own)
 		os.WriteFile(e.path("own.addr"), []byte(addr+"\n"), 0o600)
@@ -367,6 +414,10 @@ func TestEmulatorFlows(t *testing.T) {
 				"--hw-signing-file", e.path("payment.hwsfile"), "--out-file", e.path("r.witness")},
 				"Error: Cancelled\n"},
 		} {
+			if (c.args[1] == "key-gen" || c.args[1] == "show") && cancelsShowByMenu(model) {
+				t.Logf("%s %s: the %s cancels it through a menu the debug link cannot reach", c.args[0], c.args[1], model)
+				continue
+			}
 			code, out := e.run(c.args...)
 			if code != 1 || !strings.HasSuffix(out, c.want) {
 				t.Errorf("%s %s: exit %d: %q, want %q at the end", c.args[0], c.args[1], code, out, c.want)
