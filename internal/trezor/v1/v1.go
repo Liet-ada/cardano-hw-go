@@ -42,13 +42,28 @@ func (c *Conn) Write(msgType uint16, data []byte) error {
 	return nil
 }
 
-// Read returns the next message, waiting up to timeout for each packet
-// (zero waits without limit).
+// Read returns the next message, waiting up to timeout for all of it (zero
+// waits without limit), so that a device sending packets that are not a
+// message cannot keep it waiting longer.
 func (c *Conn) Read(timeout time.Duration) (uint16, []byte, error) {
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	read := func() ([]byte, error) {
+		if deadline.IsZero() {
+			return c.Link.Read(0)
+		}
+		wait := time.Until(deadline)
+		if wait <= 0 {
+			return nil, wire.ErrTimeout
+		}
+		return c.Link.Read(wait)
+	}
 	var p []byte
 	var err error
 	for {
-		if p, err = c.Link.Read(timeout); err != nil {
+		if p, err = read(); err != nil {
 			return 0, nil, err
 		}
 		if len(p) >= 9 && p[0] == '?' && p[1] == '#' && p[2] == '#' {
@@ -62,7 +77,7 @@ func (c *Conn) Read(timeout time.Duration) (uint16, []byte, error) {
 	}
 	data := append([]byte{}, p[9:]...)
 	for uint32(len(data)) < n {
-		if p, err = c.Link.Read(timeout); err != nil {
+		if p, err = read(); err != nil {
 			return 0, nil, err
 		}
 		if len(p) < 1 || p[0] != '?' {

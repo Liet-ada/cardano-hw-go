@@ -38,7 +38,8 @@ static UInt32 hid_u32(IOHIDDeviceRef d, CFStringRef key) {
 static void hid_str(IOHIDDeviceRef d, CFStringRef key, char *buf, int len) {
 	buf[0] = 0;
 	CFTypeRef v = IOHIDDeviceGetProperty(d, key);
-	if (v && CFGetTypeID(v) == CFStringGetTypeID()) CFStringGetCString((CFStringRef)v, buf, len, kCFStringEncodingUTF8);
+	// the buffer's content is unspecified when the string does not fit
+	if (!v || CFGetTypeID(v) != CFStringGetTypeID() || !CFStringGetCString((CFStringRef)v, buf, len, kCFStringEncodingUTF8)) buf[0] = 0;
 }
 
 // hw_hid_list fills up to max entries for HID interfaces of vendor vid and
@@ -52,6 +53,11 @@ static int hw_hid_list(UInt32 vid, UInt32 pid, hw_hid_info *out, int max) {
 	if (set) {
 		CFIndex count = CFSetGetCount(set);
 		IOHIDDeviceRef *devs = calloc(count ? count : 1, sizeof *devs);
+		if (!devs) {
+			CFRelease(set);
+			CFRelease(m);
+			return -1;
+		}
 		CFSetGetValues(set, (const void **)devs);
 		for (CFIndex i = 0; i < count; i++) {
 			IOHIDDeviceRef d = devs[i];
@@ -109,6 +115,15 @@ static void hid_removed(void *ctx, IOReturn result, void *sender) {
 	pthread_mutex_unlock(&h->mu);
 }
 
+static int hid_closed(hw_hid *h) {
+	pthread_mutex_lock(&h->mu);
+	int c = h->closed;
+	pthread_mutex_unlock(&h->mu);
+	return c;
+}
+
+// hid_thread runs the loop in short turns and looks at closed between
+// them: a CFRunLoopStop sent before the loop runs would be lost.
 static void *hid_thread(void *arg) {
 	hw_hid *h = arg;
 	h->loop = CFRunLoopGetCurrent();
@@ -117,7 +132,7 @@ static void *hid_thread(void *arg) {
 	h->ready = 1;
 	pthread_cond_broadcast(&h->cond);
 	pthread_mutex_unlock(&h->mu);
-	CFRunLoopRun();
+	while (!hid_closed(h)) CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.25, false);
 	IOHIDDeviceUnscheduleFromRunLoop(h->dev, h->loop, kCFRunLoopDefaultMode);
 	return NULL;
 }
@@ -135,12 +150,24 @@ static IOReturn hw_hid_open(UInt64 id, hw_hid **out) {
 		return r;
 	}
 	hw_hid *h = calloc(1, sizeof *h);
+	if (!h) {
+		IOHIDDeviceClose(dev, kIOHIDOptionsTypeNone);
+		CFRelease(dev);
+		return kIOReturnNoMemory;
+	}
 	h->dev = dev;
 	pthread_mutex_init(&h->mu, NULL);
 	pthread_cond_init(&h->cond, NULL);
 	IOHIDDeviceRegisterInputReportCallback(dev, h->in, sizeof h->in, hid_report, h);
 	IOHIDDeviceRegisterRemovalCallback(dev, hid_removed, h);
-	pthread_create(&h->thread, NULL, hid_thread, h);
+	if (pthread_create(&h->thread, NULL, hid_thread, h) != 0) {
+		IOHIDDeviceClose(dev, kIOHIDOptionsTypeNone);
+		CFRelease(dev);
+		pthread_mutex_destroy(&h->mu);
+		pthread_cond_destroy(&h->cond);
+		free(h);
+		return kIOReturnNoResources;
+	}
 	pthread_mutex_lock(&h->mu);
 	while (!h->ready) pthread_cond_wait(&h->cond, &h->mu);
 	pthread_mutex_unlock(&h->mu);
@@ -240,7 +267,7 @@ func ListHID(m Matcher) ([]Info, error) {
 }
 
 type hidDevice struct {
-	mu     sync.Mutex
+	mu     sync.Mutex // serializes reports and Close, which frees h
 	h      *C.hw_hid
 	closed bool
 }
@@ -260,6 +287,8 @@ func OpenHID(info Info) (Device, error) {
 
 // Write sends an output report (without a report id).
 func (d *hidDevice) Write(p []byte) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.closed {
 		return ErrClosed
 	}
@@ -270,6 +299,8 @@ func (d *hidDevice) Write(p []byte) error {
 }
 
 func (d *hidDevice) Read(timeout time.Duration) ([]byte, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.closed {
 		return nil, ErrClosed
 	}

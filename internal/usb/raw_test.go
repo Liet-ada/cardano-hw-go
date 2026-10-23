@@ -15,6 +15,7 @@ import (
 // TestRawReadSignals checks that signals do not end a pending read of a
 // connected Trezor, when USB_TREZOR=1. The Go runtime signals its own
 // threads, and IOKit aborts a synchronous transfer whose thread takes one.
+// It also checks that AbortPipe ends the read when its timeout runs out.
 func TestRawReadSignals(t *testing.T) {
 	if os.Getenv("USB_TREZOR") != "1" {
 		t.Skip("USB_TREZOR not set")
@@ -46,7 +47,11 @@ func TestRawReadSignals(t *testing.T) {
 		kill.Process.Kill()
 		kill.Wait()
 	}()
+	start := time.Now()
 	if _, err := d.Read(3 * time.Second); !errors.Is(err, ErrTimeout) {
 		t.Fatalf("read: %v, want a timeout", err)
+	}
+	if took := time.Since(start); took > 4*time.Second {
+		t.Fatalf("the read took %v to time out after 3s", took)
 	}
 }

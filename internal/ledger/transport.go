@@ -34,10 +34,13 @@ const (
 	hidChannel    = 0x0101
 	hidTagAPDU    = 0x05
 	hidPacketSize = 64
-	// readTimeout bounds each wait for the device, which may wait for the
-	// person to confirm.
-	readTimeout = 5 * time.Minute
 )
+
+// readTimeout bounds each response of the device, which may wait for the
+// person to confirm; a variable for the tests.
+var readTimeout = 5 * time.Minute
+
+var errReadTimeout = errors.New("ledger: timeout waiting for the device")
 
 // HIDTransport frames APDUs into the HID reports of Ledger devices.
 type HIDTransport struct {
@@ -75,11 +78,18 @@ func (t *HIDTransport) write(apdu []byte) error {
 	return nil
 }
 
+// read waits up to readTimeout for the whole response, so that packets of
+// other channels cannot keep it waiting longer.
 func (t *HIDTransport) read() ([]byte, error) {
+	deadline := time.Now().Add(readTimeout)
 	var out []byte
 	want := -1
 	for seq := 0; want < 0 || len(out) < want; {
-		p, err := t.dev.Read(readTimeout)
+		wait := time.Until(deadline)
+		if wait <= 0 {
+			return nil, errReadTimeout
+		}
+		p, err := t.dev.Read(wait)
 		if err != nil {
 			return nil, err
 		}

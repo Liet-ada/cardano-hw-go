@@ -38,8 +38,9 @@ static void prop_str(io_service_t s, CFStringRef key, char *buf, int len) {
 	buf[0] = 0;
 	CFTypeRef v = IORegistryEntrySearchCFProperty(s, kIOServicePlane, key, kCFAllocatorDefault, 0);
 	if (!v) return;
-	if (CFGetTypeID(v) == CFStringGetTypeID()) {
-		CFStringGetCString((CFStringRef)v, buf, len, kCFStringEncodingUTF8);
+	// the buffer's content is unspecified when the string does not fit
+	if (CFGetTypeID(v) != CFStringGetTypeID() || !CFStringGetCString((CFStringRef)v, buf, len, kCFStringEncodingUTF8)) {
+		buf[0] = 0;
 	}
 	CFRelease(v);
 }
@@ -133,6 +134,9 @@ static IOReturn open_interface(IOUSBDeviceInterface320 **dev, UInt8 number, hw_r
 			if (dir == kUSBOut && !h->pipeOut) h->pipeOut = pipe;
 		}
 		if (!h->pipeIn || !h->pipeOut) {
+			// a retry after configuring the device starts afresh
+			h->pipeIn = h->pipeOut = 0;
+			h->packetSize = 0;
 			(*intf)->USBInterfaceClose(intf);
 			(*intf)->Release(intf);
 			r = kIOReturnNotFound;
@@ -175,6 +179,10 @@ static IOReturn hw_raw_open(UInt32 location, UInt8 number, hw_raw **out) {
 	if (!dev) return kIOReturnError;
 
 	hw_raw *h = calloc(1, sizeof *h);
+	if (!h) {
+		(*dev)->Release(dev);
+		return kIOReturnNoMemory;
+	}
 	h->dev = dev;
 	r = open_interface(dev, number, h);
 	if (r == kIOReturnNotFound) {
@@ -260,7 +268,7 @@ func ListRaw(m Matcher, iface int) ([]Info, error) {
 }
 
 type rawDevice struct {
-	mu     sync.Mutex // serializes reads
+	mu     sync.Mutex // serializes transfers and Close, which frees h
 	h      *C.hw_raw
 	size   int
 	closed bool
@@ -300,6 +308,8 @@ func OpenRaw(info Info) (Device, error) {
 }
 
 func (d *rawDevice) Write(p []byte) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.closed {
 		return ErrClosed
 	}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -22,7 +23,7 @@ func ListHID(m Matcher) ([]Info, error) { return listHIDRaw(m) }
 type hidDevice struct {
 	mu     sync.Mutex
 	f      *os.File
-	closed bool
+	closed atomic.Bool // os.File takes a Close during a read
 }
 
 // OpenHID opens a listed HID interface.
@@ -44,7 +45,7 @@ func hidError(op string, err error) error {
 // Write sends an output report. hidraw takes the report id first: 0, for
 // devices without report ids, is not sent.
 func (d *hidDevice) Write(p []byte) error {
-	if d.closed {
+	if d.closed.Load() {
 		return ErrClosed
 	}
 	if _, err := d.f.Write(append([]byte{0}, p...)); err != nil {
@@ -54,7 +55,7 @@ func (d *hidDevice) Write(p []byte) error {
 }
 
 func (d *hidDevice) Read(timeout time.Duration) ([]byte, error) {
-	if d.closed {
+	if d.closed.Load() {
 		return nil, ErrClosed
 	}
 	var deadline time.Time
@@ -78,9 +79,9 @@ func (d *hidDevice) Read(timeout time.Duration) ([]byte, error) {
 func (d *hidDevice) Close() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.closed {
+	if d.closed.Load() {
 		return nil
 	}
-	d.closed = true
+	d.closed.Store(true)
 	return d.f.Close()
 }
