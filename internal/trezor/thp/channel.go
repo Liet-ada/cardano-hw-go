@@ -177,6 +177,12 @@ func Open(link wire.Link, o Options) (*Channel, error) {
 			return nil, err
 		}
 	case statePaired, statePairedAutoconnect:
+		// Only a credential proves the other end is the Trezor this host
+		// paired with; without one, a device that claims to know the host
+		// would skip the pairing code.
+		if credential == nil {
+			return nil, errors.New("thp: the device says this host is paired, but the host sent it no credential")
+		}
 		c.Paired, c.Autoconnect = true, state == statePairedAutoconnect
 	}
 	if _, err := c.call(0, msg.TypeThpEndRequest, &msg.ThpEndRequest{}, msg.TypeThpEndResponse, &msg.ThpEndResponse{}); err != nil {

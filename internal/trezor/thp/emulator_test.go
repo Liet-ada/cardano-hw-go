@@ -52,6 +52,9 @@ func (u *debugUI) PairingCode(info thp.PairingInfo) (string, error) {
 
 func (u *debugUI) ButtonRequest(code uint32, name string) {
 	u.t.Logf("button request %d %q", code, name)
+	if u.debug == nil {
+		return
+	}
 	go func() {
 		time.Sleep(300 * time.Millisecond)
 		if err := u.debug.PressYes(); err != nil {
