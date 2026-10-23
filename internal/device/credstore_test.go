@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Liet-ada/cardano-hw-go/internal/trezor/thp"
@@ -57,5 +58,65 @@ func TestFileStore(t *testing.T) {
 		if fi.Mode() != mode {
 			t.Errorf("%s: mode %v, want %v", path, fi.Mode(), mode)
 		}
+	}
+}
+
+// A malformed entry is skipped instead of hiding the other credentials, and
+// a damaged file is reported with its path.
+func TestFileStoreDamaged(t *testing.T) {
+	s := &FileStore{Path: filepath.Join(t.TempDir(), "thp-credentials.json")}
+	good := testCredential(1, 2, 3)
+	if err := s.Save(good); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(s.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := `{"trezor_static_public_key": "zz", "host_static_private_key": "00", "credential": ""},` + "\n"
+	short := `{"trezor_static_public_key": "0101", "host_static_private_key": "0202", "credential": "03"},` + "\n"
+	data = bytes.Replace(data, []byte("[\n"), []byte("[\n"+bad+short), 1)
+	if err := os.WriteFile(s.Path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Credentials()
+	if err != nil || len(got) != 1 || !bytes.Equal(got[0].Credential, good.Credential) {
+		t.Fatalf("got %v, %v; want only the good credential", got, err)
+	}
+
+	if err := os.WriteFile(s.Path, []byte("[{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Credentials(); err == nil || !strings.Contains(err.Error(), s.Path) {
+		t.Fatalf("damaged file: %v", err)
+	}
+}
+
+// Save tightens a directory that was already there and does not write
+// through a file planted next to the credentials.
+func TestFileStoreDirectoryAndTemporary(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "cardano-hw-go")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := &FileStore{Path: filepath.Join(dir, "thp-credentials.json")}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, s.Path+".tmp"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save(testCredential(1, 2, 3)); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(dir); err != nil || fi.Mode().Perm() != 0o700 {
+		t.Fatalf("directory: %v, %v", fi.Mode(), err)
+	}
+	if data, err := os.ReadFile(outside); err != nil || len(data) != 0 {
+		t.Fatalf("wrote %d bytes through the planted link (%v)", len(data), err)
+	}
+	if fi, err := os.Lstat(s.Path); err != nil || fi.Mode() != 0o600 {
+		t.Fatalf("file: %v, %v", fi.Mode(), err)
 	}
 }

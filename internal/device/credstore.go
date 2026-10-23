@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -49,12 +50,14 @@ func (s *FileStore) load() ([]storedCredential, error) {
 	}
 	var creds []storedCredential
 	if err := json.Unmarshal(data, &creds); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the THP credentials in %s are damaged (%v); delete the file and pair the Trezor again", s.Path, err)
 	}
 	return creds, nil
 }
 
-// Credentials returns the stored credentials.
+// Credentials returns the stored credentials. A malformed entry is skipped,
+// so that it does not keep the other Trezors from connecting; its Trezor
+// will ask to pair again.
 func (s *FileStore) Credentials() ([]thp.Credential, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -67,8 +70,8 @@ func (s *FileStore) Credentials() ([]thp.Credential, error) {
 		ts, err1 := hex.DecodeString(c.TrezorStaticPublicKey)
 		hs, err2 := hex.DecodeString(c.HostStaticPrivateKey)
 		cr, err3 := hex.DecodeString(c.Credential)
-		if err := errors.Join(err1, err2, err3); err != nil {
-			return nil, err
+		if errors.Join(err1, err2, err3) != nil || len(ts) != 32 || len(hs) != 32 || len(cr) == 0 {
+			continue
 		}
 		out = append(out, thp.Credential{TrezorStaticPublicKey: ts, HostStaticPrivateKey: hs, Credential: cr})
 	}
@@ -95,13 +98,27 @@ func (s *FileStore) Save(c thp.Credential) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(s.Path), 0o700); err != nil {
+	dir := filepath.Dir(s.Path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	tmp := s.Path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	// MkdirAll leaves the mode of a directory that was already there
+	if err := os.Chmod(dir, 0o700); err != nil {
 		return err
 	}
-	excludeFromBackup(tmp)
-	return os.Rename(tmp, s.Path)
+	// a temporary file of its own (O_EXCL, 0600), never one left there
+	tmp, err := os.CreateTemp(dir, ".thp-credentials-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name()) // fails once renamed
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	excludeFromBackup(tmp.Name())
+	return os.Rename(tmp.Name(), s.Path)
 }
